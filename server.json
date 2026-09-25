@@ -1,0 +1,42 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "eu.ruralcheck/ruralcheck",
+  "title": "RuralCheck",
+  "description": "Location analysis for rural property in Europe: flood, noise, sun hours, land register and more.",
+  "websiteUrl": "https://ruralcheck.eu",
+  "repository": {
+    "url": "https://github.com/cmosig/ruralcheck-mcp",
+    "source": "github"
+  },
+  "version": "0.1.0",
+  "remotes": [
+    {
+      "type": "streamable-http",
+      "url": "https://ruralcheck.eu/mcp",
+      "headers": [
+        {
+          "name": "Authorization",
+          "description": "Bearer followed by your RuralCheck API key. Free checks work without one.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "pypi",
+      "identifier": "ruralcheck-mcp",
+      "version": "0.1.0",
+      "transport": { "type": "stdio" },
+      "environmentVariables": [
+        {
+          "name": "RURALCHECK_API_KEY",
+          "description": "Your RuralCheck API key. Free checks work without one.",
+          "isRequired": false,
+          "isSecret": true
+        }
+      ]
+    }
+  ]
+}

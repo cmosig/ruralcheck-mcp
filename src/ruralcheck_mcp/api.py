@@ -1,0 +1,119 @@
+"""A small async client for the RuralCheck HTTP API.
+
+Everything the MCP tools do goes through here, so the tools stay a thin layer of
+descriptions and the API stays the one place that decides what a report says.
+"""
+from __future__ import annotations
+
+import os
+from dataclasses import dataclass
+from typing import Any
+
+import httpx
+
+DEFAULT_BASE_URL = "https://ruralcheck.eu"
+USER_AGENT = "ruralcheck-mcp"
+
+
+class APIError(Exception):
+    """The API refused or failed. `status` is the HTTP status, `body` what it said."""
+
+    def __init__(self, status: int, message: str, body: Any = None):
+        super().__init__(message)
+        self.status = status
+        self.body = body
+
+
+@dataclass
+class Config:
+    base_url: str = DEFAULT_BASE_URL
+    api_key: str | None = None
+    timeout_s: float = 30.0
+
+    @classmethod
+    def from_env(cls) -> "Config":
+        return cls(
+            base_url=os.environ.get("RURALCHECK_BASE_URL", DEFAULT_BASE_URL).rstrip("/"),
+            api_key=os.environ.get("RURALCHECK_API_KEY") or None,
+        )
+
+
+class RuralCheck:
+    """One API key, one connection pool."""
+
+    def __init__(self, config: Config, transport: httpx.AsyncBaseTransport | None = None):
+        self.config = config
+        headers = {"User-Agent": USER_AGENT, "Accept": "application/json"}
+        if config.api_key:
+            headers["Authorization"] = f"Bearer {config.api_key}"
+        self._http = httpx.AsyncClient(
+            base_url=config.base_url, headers=headers,
+            timeout=config.timeout_s, transport=transport,
+        )
+
+    async def aclose(self) -> None:
+        await self._http.aclose()
+
+    async def _call(self, method: str, path: str, *, ok: tuple[int, ...] = (200,),
+                    **kwargs: Any) -> tuple[int, Any]:
+        r = await self._http.request(method, path, **kwargs)
+        try:
+            body = r.json()
+        except ValueError:
+            body = None
+        if r.status_code in ok:
+            return r.status_code, body
+        detail = body.get("detail") if isinstance(body, dict) else None
+        if not isinstance(detail, str):
+            detail = None
+        raise APIError(r.status_code, _explain(r.status_code, detail), body)
+
+    # Free, no key needed.
+
+    async def search(self, query: str) -> dict:
+        return (await self._call("GET", "/api/v1/search", params={"q": query, "committed": "true"}))[1]
+
+    async def coverage(self, lat: float, lon: float) -> dict:
+        return (await self._call("GET", "/api/v1/coverage", params={"lat": lat, "lon": lon}))[1]
+
+    async def checks(self) -> dict:
+        return (await self._call("GET", "/api/v1/checks"))[1]
+
+    async def cost(self, checks: list[str] | None) -> dict:
+        params = {"checks": ",".join(checks)} if checks else None
+        return (await self._call("GET", "/api/v1/cost", params=params))[1]
+
+    async def sample(self) -> dict:
+        return (await self._call("GET", "/api/v1/sample"))[1]
+
+    # Needs a key.
+
+    async def start(self, lat: float, lon: float, checks: list[str] | None,
+                    wait_s: int = 0) -> tuple[int, dict]:
+        """Ask for a report: 202 running, 200 finished within `wait_s`, 409 not served."""
+        payload: dict[str, Any] = {"lat": lat, "lon": lon}
+        if checks:
+            payload["checks"] = checks
+        return await self._call("POST", "/api/v1/reports", json=payload,
+                                params={"wait": wait_s} if wait_s else None,
+                                ok=(200, 202, 409), timeout=wait_s + self.config.timeout_s)
+
+    async def report(self, report_id: str, wait_s: int = 0) -> dict:
+        return (await self._call("GET", f"/api/v1/reports/{report_id}",
+                                 params={"wait": wait_s} if wait_s else None,
+                                 timeout=wait_s + self.config.timeout_s))[1]
+
+
+def _explain(status: int, detail: str | None) -> str:
+    """Say what went wrong in words an agent can relay to a person."""
+    base = {
+        401: "The RuralCheck API key is missing or not valid. Set RURALCHECK_API_KEY.",
+        402: "This account's plan or credits do not cover this report.",
+        403: "This account may not do that.",
+        404: "Not found.",
+        409: "RuralCheck does not analyse this point.",
+        422: "The request was not valid.",
+        429: "Too many requests. Wait a minute and try again.",
+        503: "RuralCheck is busy or restarting. Try again shortly.",
+    }.get(status, f"The RuralCheck API answered {status}.")
+    return f"{base} ({detail})" if detail else base
