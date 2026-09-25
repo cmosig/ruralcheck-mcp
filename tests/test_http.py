@@ -68,6 +68,7 @@ def test_a_good_key_gets_through_and_is_checked_once():
     assert call(app, token="rc_good")["body"] == b"inner"
     assert call(app, token="rc_good")["body"] == b"inner"
     assert len(seen) == 1 and seen[0].headers["authorization"] == "Bearer rc_good"
+    assert seen[0].headers["x-ruralcheck-token-check"] == "1"
 
 
 def test_a_free_accounts_key_gets_through_and_the_tools_say_why_not():

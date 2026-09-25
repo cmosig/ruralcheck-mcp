@@ -90,7 +90,10 @@ class TokenGate:
         async with httpx.AsyncClient(base_url=config.base_url, timeout=10,
                                      transport=self.transport,
                                      headers={"User-Agent": USER_AGENT,
-                                              "Authorization": f"Bearer {token}"}) as c:
+                                              "Authorization": f"Bearer {token}",
+                                              # So the API does not count this as the
+                                              # reader asking for the check list.
+                                              "X-RuralCheck-Token-Check": "1"}) as c:
             r = await c.get("/api/v1/checks")
         # 402 is a real key on a free account: the sign-in worked, and each tool
         # says what the plan does not include. Only 401 means the token is wrong.
