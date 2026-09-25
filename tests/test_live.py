@@ -5,7 +5,7 @@ Skipped unless both are set:
     RURALCHECK_LIVE_URL   e.g. http://127.0.0.1:8046 or https://ruralcheck.eu
     RURALCHECK_API_KEY    a key on that instance
 Run it after any change to /api/v1 on the RuralCheck side, against the preview
-that carries the change. Spends 0.15 of a credit (one noise check).
+that carries the change. Runs one noise check.
 """
 from __future__ import annotations
 
@@ -39,23 +39,21 @@ def calls(*steps):
 
 
 def test_the_contract_holds():
-    (e1, checks), (e2, cov), (e3, quote), (e4, place), (e5, sample), (e6, report), (e7, bad) = calls(
+    (e1, checks), (e2, cov), (e4, place), (e5, sample), (e6, report), (e7, bad) = calls(
         ("list_checks", {}),
         ("check_coverage", PLOT),
-        ("quote_cost", {"checks": ["noise"]}),
         ("find_place", {"query": "Furtwangen"}),
         ("sample_report", {"checks": ["flood"]}),
         ("analyse_plot", {**PLOT, "checks": ["noise"]}),
         ("analyse_plot", {**PLOT, "checks": ["no_such_check"]}),
     )
-    assert not any((e1, e2, e3, e4, e5, e6)), (checks, cov, quote, place, sample, report)
+    assert not any((e1, e2, e4, e5, e6)), (checks, cov, place, sample, report)
 
     names = {c["name"] for c in checks["checks"]}
     assert {"flood", "noise", "sun", "parcel"} <= names
-    assert all({"name", "cost", "free", "runs"} <= set(c) for c in checks["checks"])
+    assert all({"name", "runs"} <= set(c) for c in checks["checks"])
 
     assert cov["served"] is True
-    assert quote["cost"] > 0 and "noise" in quote["runs"]
     assert place["results"] and "lat" in place["results"][0]
     assert "flood" in sample["results"]
 

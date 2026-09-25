@@ -16,7 +16,7 @@ from ruralcheck_mcp import server
 
 DONE = {
     "id": "abc123", "status": "done", "location": {"lat": 48.0, "lon": 8.2},
-    "checks": ["flood"], "runs": ["flood"], "cost": 0.0, "errors": {},
+    "checks": ["flood"], "runs": ["flood"], "errors": {},
     "modules": {"flood": {"available": True, "levels": []}},
     "attribution": ["Flood hazard maps (c) European Union, JRC."],
     "disclaimer": "For information only.", "horizon": {"azimuth_deg": [0.0] * 360},
@@ -63,7 +63,7 @@ def test_tools_are_listed_with_honest_hints():
         async with Client(server.mcp) as client:
             return {t.name: t for t in (await client.list_tools()).tools}
     tools = run(go())
-    assert set(tools) == {"find_place", "check_coverage", "list_checks", "quote_cost",
+    assert set(tools) == {"find_place", "check_coverage", "list_checks",
                           "analyse_plot", "get_report", "sample_report"}
     # analyse_plot spends credits, so it must not claim to be read-only.
     assert tools["analyse_plot"].annotations.read_only_hint is False
@@ -121,7 +121,7 @@ def test_unknown_check_is_an_error_listing_the_valid_names():
 
 
 def test_refusals_say_what_to_do():
-    for status, words in [(401, "RURALCHECK_API_KEY"), (402, "credits"), (429, "Wait")]:
+    for status, words in [(401, "RURALCHECK_API_KEY"), (402, "plan"), (429, "Wait")]:
         transport, _ = fake_api({("POST", "/api/v1/reports"): (status, {"detail": "no."})})
         err, text = run(call(transport, "analyse_plot", {"lat": 48.0, "lon": 8.2}))
         assert err and words in text, (status, text)
@@ -135,7 +135,7 @@ def test_coordinates_outside_europe_never_reach_the_api():
 
 def test_every_tool_needs_a_key_and_says_so():
     args = {"find_place": {"query": "Furtwangen"}, "check_coverage": {"lat": 48.0, "lon": 8.2},
-            "list_checks": {}, "quote_cost": {"checks": ["noise"]},
+            "list_checks": {},
             "analyse_plot": {"lat": 48.0, "lon": 8.2}, "get_report": {"report_id": "abc123"},
             "sample_report": {}}
     for tool, a in args.items():

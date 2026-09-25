@@ -79,10 +79,6 @@ class RuralCheck:
     async def checks(self) -> dict:
         return (await self._call("GET", "/api/v1/checks"))[1]
 
-    async def cost(self, checks: list[str] | None) -> dict:
-        params = {"checks": ",".join(checks)} if checks else None
-        return (await self._call("GET", "/api/v1/cost", params=params))[1]
-
     async def sample(self) -> dict:
         return (await self._call("GET", "/api/v1/sample"))[1]
 
@@ -117,7 +113,7 @@ def _explain(status: int, detail: str | None) -> str:
     """Say what went wrong in words an agent can relay to a person."""
     base = {
         401: "The RuralCheck API key is missing or not valid. Set RURALCHECK_API_KEY.",
-        402: "This account's plan or credits do not cover this report.",
+        402: "This account's plan does not include this.",
         403: "This account may not do that.",
         404: "Not found.",
         409: "RuralCheck does not analyse this point.",

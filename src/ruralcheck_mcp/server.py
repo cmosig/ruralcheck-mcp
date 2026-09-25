@@ -32,9 +32,8 @@ climate now and around 2050, drive times and more.
 
 Typical flow: find_place to turn a name into coordinates, check_coverage to see
 whether the point is served, then analyse_plot. Ask only for the checks the
-question needs, from list_checks: a whole report is large. Every tool needs an API
-key from a paid RuralCheck plan. Most checks spend no credit; terrain, noise, sun,
-view and wind spend a share of one.
+question needs, from list_checks: a whole report is large. Every tool needs a paid
+RuralCheck plan, which includes every check with no limit on reports.
 
 Everything is computed from public data and is an estimate, not a survey, a
 valuation or legal advice. Pass on the caveats each check carries.
@@ -111,9 +110,9 @@ async def _call(ctx: Context, fn: Callable[[RuralCheck], Awaitable[Any]]) -> str
         await api.aclose()
 
 
-NO_KEY = ("RuralCheck needs an API key from a paid plan. Set RURALCHECK_API_KEY, or "
-          "send 'Authorization: Bearer <key>' to the hosted server. Keys are made on "
-          "the account page at ruralcheck.eu.")
+NO_KEY = ("RuralCheck needs a paid plan. Set RURALCHECK_API_KEY to a key from the "
+          "account page at ruralcheck.eu, or connect to the hosted server, which signs "
+          "you in.")
 
 CHECKS = Annotated[list[str] | None, Field(
     description="Check names from list_checks, e.g. ['flood', 'noise', 'sun']. "
@@ -138,29 +137,17 @@ async def check_coverage(lat: LAT, lon: LON, ctx: Context) -> str:
     """Whether RuralCheck can analyse this point, and how finely the ground is measured.
 
     `served: false` means analyse_plot will refuse the point, and the answer says
-    why. Spends no credit.
+    why.
     """
     return await _call(ctx, lambda api: api.coverage(lat, lon))
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=False)
 async def list_checks(ctx: Context) -> str:
-    """Every check a report can run: its name, what it answers, whether it spends credit,
-    what it costs as a share of one credit and roughly how long it takes.
-
-    Pass names from here to analyse_plot. Spends no credit.
+    """Every check a report can run: its name, what it answers and roughly how long
+    it takes. Pass names from here to analyse_plot.
     """
     return await _call(ctx, lambda api: api.checks())
-
-
-@mcp.tool(annotations=READ_ONLY, structured_output=False)
-async def quote_cost(checks: CHECKS, ctx: Context) -> str:
-    """What analyse_plot would charge for these checks, and how long it would take,
-    without running anything. Spends no credit.
-
-    Checks that others depend on are counted in: noise brings its sources with it.
-    """
-    return await _call(ctx, lambda api: api.cost(checks))
 
 
 @mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True, idempotentHint=False),
@@ -168,10 +155,7 @@ async def quote_cost(checks: CHECKS, ctx: Context) -> str:
 async def analyse_plot(lat: LAT, lon: LON, ctx: Context, checks: CHECKS = None) -> str:
     """Analyse a plot of rural land in Europe and return the result of each check.
 
-    Most checks spend no credit; the others spend a share
-    of a credit (quote_cost says how much before you run it), and the charge is
-    refunded if any check fails. Checks a chosen one depends on run too and are
-    returned with it. Most answers take a few seconds; if one runs longer than this
+    Checks a chosen one depends on run too and are returned with it. Most answers take a few seconds; if one runs longer than this
     call waits, the answer carries an id to pass to get_report.
 
     Show the `attribution` lines to whoever reads the results: the data licences
@@ -193,8 +177,7 @@ async def get_report(
     report_id: Annotated[str, Field(max_length=64, description="The id analyse_plot returned.")],
     ctx: Context,
 ) -> str:
-    """Fetch a report analyse_plot started, by its id. Waits if it is still running.
-    Costs nothing: the charge was made when it was started."""
+    """Fetch a report analyse_plot started, by its id. Waits if it is still running."""
     async def run(api: RuralCheck) -> dict:
         return _shape(await _wait(api, report_id, ctx, time.monotonic() + WAIT_S))
     return await _call(ctx, run)
@@ -205,7 +188,6 @@ async def sample_report(ctx: Context, checks: CHECKS = None) -> str:
     """The public sample: a real full report for a plot in the Black Forest.
 
     Use it to see what each check returns before asking for a report of your own.
-    Spends no credit.
     """
     async def run(api: RuralCheck) -> dict:
         payload = await api.sample()
@@ -231,7 +213,7 @@ async def _wait(api: RuralCheck, report_id: str, ctx: Context, deadline: float) 
 
 # What a report payload carries that an agent can use. `horizon` and `dem` are
 # drawing data for the web page and would only cost tokens.
-KEEP = ("id", "status", "location", "checks", "runs", "cost", "coverage", "errors",
+KEEP = ("id", "status", "location", "checks", "runs", "coverage", "errors",
         "detail", "version", "disclaimer", "attribution")
 
 
@@ -250,7 +232,11 @@ def main() -> None:
     parser.add_argument("--port", type=int, default=8765)
     args = parser.parse_args()
     if args.http:
-        mcp.run("streamable-http", host=args.host, port=args.port, stateless_http=True)
+        import uvicorn
+
+        from .http import build
+        uvicorn.run(build(mcp, args.host, args.port), host=args.host, port=args.port,
+                    proxy_headers=True, log_level="warning")
     else:
         mcp.run()
 
