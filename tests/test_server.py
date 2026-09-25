@@ -106,6 +106,14 @@ def test_report_that_outlasts_the_call_hands_back_its_id():
     assert not err and out["id"] == "abc123" and "get_report" in out["note"]
 
 
+def test_a_report_id_cannot_leave_the_reports_path():
+    transport, seen = fake_api({})
+    for bad in ("../../account", "..", "abc/../../job/x", "abc?x=1"):
+        err, _ = run(call(transport, "get_report", {"report_id": bad}))
+        assert err, bad
+    assert not seen, [str(r.url) for r in seen]
+
+
 def test_point_not_served_is_an_answer_not_an_error():
     body = {"detail": "We do not analyse this point.", "served": False, "coverage": {"served": False}}
     transport, _ = fake_api({("POST", "/api/v1/reports"): (409, body)})

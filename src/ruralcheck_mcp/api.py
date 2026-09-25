@@ -6,6 +6,7 @@ descriptions and the API stays the one place that decides what a report says.
 from __future__ import annotations
 
 import os
+import re
 from dataclasses import dataclass
 from typing import Any
 
@@ -95,9 +96,16 @@ class RuralCheck:
                                 ok=(200, 202, 409), timeout=wait_s + self.config.timeout_s)
 
     async def report(self, report_id: str, wait_s: int = 0) -> dict:
+        # The id comes from the model, and goes into a path sent with the reader's
+        # key: "../../account" would ask the site for a page that is not the API.
+        if not _REPORT_ID.fullmatch(report_id):
+            raise APIError(404, "There is no report with this id.")
         return (await self._call("GET", f"/api/v1/reports/{report_id}",
                                  params=_report_params(wait_s),
                                  timeout=wait_s + self.config.timeout_s))[1]
+
+
+_REPORT_ID = re.compile(r"[A-Za-z0-9]{1,64}")
 
 
 def _report_params(wait_s: int) -> dict:
