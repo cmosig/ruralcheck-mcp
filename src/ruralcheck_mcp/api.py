@@ -95,13 +95,22 @@ class RuralCheck:
         if checks:
             payload["checks"] = checks
         return await self._call("POST", "/api/v1/reports", json=payload,
-                                params={"wait": wait_s} if wait_s else None,
+                                params=_report_params(wait_s),
                                 ok=(200, 202, 409), timeout=wait_s + self.config.timeout_s)
 
     async def report(self, report_id: str, wait_s: int = 0) -> dict:
         return (await self._call("GET", f"/api/v1/reports/{report_id}",
-                                 params={"wait": wait_s} if wait_s else None,
+                                 params=_report_params(wait_s),
                                  timeout=wait_s + self.config.timeout_s))[1]
+
+
+def _report_params(wait_s: int) -> dict:
+    # drawing=false leaves out the outlines and pictures the web page draws on its
+    # map: three quarters of a flood answer, and nothing a model can read.
+    params: dict[str, Any] = {"drawing": "false"}
+    if wait_s:
+        params["wait"] = wait_s
+    return params
 
 
 def _explain(status: int, detail: str | None) -> str:

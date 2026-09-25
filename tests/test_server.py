@@ -72,6 +72,7 @@ def test_report_finished_in_one_call():
     assert out["attribution"] == DONE["attribution"]
     assert "horizon" not in out, "drawing data for the web page is not for the model"
     assert json.loads(seen[0].content) == {"lat": 48.0, "lon": 8.2, "checks": ["flood"]}
+    assert seen[0].url.params["drawing"] == "false"
 
 
 def test_report_still_running_is_polled_to_the_end():
@@ -83,6 +84,7 @@ def test_report_still_running_is_polled_to_the_end():
     err, out = run(call(transport, "analyse_plot", {"lat": 48.0, "lon": 8.2}))
     assert not err and out["status"] == "done"
     assert [r.method for r in seen] == ["POST", "GET", "GET"]
+    assert all(r.url.params["drawing"] == "false" for r in seen)
 
 
 def test_report_that_outlasts_the_call_hands_back_its_id():
