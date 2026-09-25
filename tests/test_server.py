@@ -6,6 +6,7 @@ from __future__ import annotations
 
 import asyncio
 import json
+import os
 from types import SimpleNamespace
 
 import httpx
@@ -37,13 +38,18 @@ def fake_api(routes: dict):
     return httpx.MockTransport(handle), seen
 
 
-async def call(transport, tool: str, args: dict):
+async def call(transport, tool: str, args: dict, key: str | None = "rc_test"):
     server.TRANSPORT = transport
+    if key:
+        os.environ["RURALCHECK_API_KEY"] = key
+    else:
+        os.environ.pop("RURALCHECK_API_KEY", None)
     try:
         async with Client(server.mcp) as client:
             result = await client.call_tool(tool, args)
     finally:
         server.TRANSPORT = None
+        os.environ.pop("RURALCHECK_API_KEY", None)
     text = result.content[0].text
     return result.is_error, (text if result.is_error else json.loads(text))
 
@@ -125,6 +131,24 @@ def test_coordinates_outside_europe_never_reach_the_api():
     transport, seen = fake_api({})
     err, _ = run(call(transport, "analyse_plot", {"lat": -33.9, "lon": 18.4}))
     assert err and not seen
+
+
+def test_every_tool_needs_a_key_and_says_so():
+    args = {"find_place": {"query": "Furtwangen"}, "check_coverage": {"lat": 48.0, "lon": 8.2},
+            "list_checks": {}, "quote_cost": {"checks": ["noise"]},
+            "analyse_plot": {"lat": 48.0, "lon": 8.2}, "get_report": {"report_id": "abc123"},
+            "sample_report": {}}
+    for tool, a in args.items():
+        transport, seen = fake_api({})
+        err, text = run(call(transport, tool, a, key=None))
+        assert err and "paid plan" in text, (tool, text)
+        assert not seen, f"{tool} reached the API without a key"
+
+
+def test_key_is_sent():
+    transport, seen = fake_api({("GET", "/api/v1/checks"): (200, {"checks": []})})
+    run(call(transport, "list_checks", {}))
+    assert seen[0].headers["Authorization"] == "Bearer rc_test"
 
 
 def test_http_callers_key_wins_over_the_environment():

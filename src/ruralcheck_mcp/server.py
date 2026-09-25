@@ -32,8 +32,9 @@ climate now and around 2050, drive times and more.
 
 Typical flow: find_place to turn a name into coordinates, check_coverage to see
 whether the point is served, then analyse_plot. Ask only for the checks the
-question needs, from list_checks: a whole report is large. Most checks are free;
-terrain, noise, sun, view and wind spend a share of a credit.
+question needs, from list_checks: a whole report is large. Every tool needs an API
+key from a paid RuralCheck plan. Most checks spend no credit; terrain, noise, sun,
+view and wind spend a share of one.
 
 Everything is computed from public data and is an estimate, not a survey, a
 valuation or legal advice. Pass on the caveats each check carries.
@@ -91,6 +92,12 @@ async def _call(ctx: Context, fn: Callable[[RuralCheck], Awaitable[Any]]) -> str
     report that is three quarters of the text the model has to read.
     """
     api = _client(ctx)
+    if not api.config.api_key:
+        # Checked here as well as by the API, so the refusal is the same sentence
+        # whichever tool was called. Listing the tools needs no key: a client has to
+        # see what the server offers before anyone can decide to pay for it.
+        await api.aclose()
+        raise ToolError(NO_KEY)
     try:
         return json.dumps(await fn(api), separators=(",", ":"), ensure_ascii=False)
     except APIError as exc:
@@ -104,6 +111,10 @@ async def _call(ctx: Context, fn: Callable[[RuralCheck], Awaitable[Any]]) -> str
         await api.aclose()
 
 
+NO_KEY = ("RuralCheck needs an API key from a paid plan. Set RURALCHECK_API_KEY, or "
+          "send 'Authorization: Bearer <key>' to the hosted server. Keys are made on "
+          "the account page at ruralcheck.eu.")
+
 CHECKS = Annotated[list[str] | None, Field(
     description="Check names from list_checks, e.g. ['flood', 'noise', 'sun']. "
                 "Omit for every check.")]
@@ -116,7 +127,7 @@ async def find_place(
 ) -> str:
     """Turn a village, town or region name in Europe into coordinates.
 
-    Free and needs no key. Street addresses are not searchable: an address is
+    Street addresses are not searchable: an address is
     reduced to the settlement it names and marked approximate.
     """
     return await _call(ctx, lambda api: api.search(query))
@@ -126,18 +137,18 @@ async def find_place(
 async def check_coverage(lat: LAT, lon: LON, ctx: Context) -> str:
     """Whether RuralCheck can analyse this point, and how finely the ground is measured.
 
-    Free and needs no key. `served: false` means analyse_plot will refuse the
-    point, and the answer says why.
+    `served: false` means analyse_plot will refuse the point, and the answer says
+    why. Spends no credit.
     """
     return await _call(ctx, lambda api: api.coverage(lat, lon))
 
 
 @mcp.tool(annotations=READ_ONLY, structured_output=False)
 async def list_checks(ctx: Context) -> str:
-    """Every check a report can run: its name, what it answers, whether it is free,
+    """Every check a report can run: its name, what it answers, whether it spends credit,
     what it costs as a share of one credit and roughly how long it takes.
 
-    Free and needs no key. Pass names from here to analyse_plot.
+    Pass names from here to analyse_plot. Spends no credit.
     """
     return await _call(ctx, lambda api: api.checks())
 
@@ -145,7 +156,7 @@ async def list_checks(ctx: Context) -> str:
 @mcp.tool(annotations=READ_ONLY, structured_output=False)
 async def quote_cost(checks: CHECKS, ctx: Context) -> str:
     """What analyse_plot would charge for these checks, and how long it would take,
-    without running anything. Free and needs no key.
+    without running anything. Spends no credit.
 
     Checks that others depend on are counted in: noise brings its sources with it.
     """
@@ -157,7 +168,7 @@ async def quote_cost(checks: CHECKS, ctx: Context) -> str:
 async def analyse_plot(lat: LAT, lon: LON, ctx: Context, checks: CHECKS = None) -> str:
     """Analyse a plot of rural land in Europe and return the result of each check.
 
-    Needs a RuralCheck API key. Free checks cost nothing; the others spend a share
+    Most checks spend no credit; the others spend a share
     of a credit (quote_cost says how much before you run it), and the charge is
     refunded if any check fails. Checks a chosen one depends on run too and are
     returned with it. Most answers take a few seconds; if one runs longer than this
@@ -193,8 +204,8 @@ async def get_report(
 async def sample_report(ctx: Context, checks: CHECKS = None) -> str:
     """The public sample: a real full report for a plot in the Black Forest.
 
-    Free and needs no key. Use it to see what each check returns before asking
-    for a report of your own.
+    Use it to see what each check returns before asking for a report of your own.
+    Spends no credit.
     """
     async def run(api: RuralCheck) -> dict:
         payload = await api.sample()

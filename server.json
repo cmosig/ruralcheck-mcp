@@ -16,8 +16,8 @@
       "headers": [
         {
           "name": "Authorization",
-          "description": "Bearer followed by your RuralCheck API key. Free checks work without one.",
-          "isRequired": false,
+          "description": "Bearer followed by your RuralCheck API key, from a paid plan.",
+          "isRequired": true,
           "isSecret": true
         }
       ]
@@ -32,8 +32,8 @@
       "environmentVariables": [
         {
           "name": "RURALCHECK_API_KEY",
-          "description": "Your RuralCheck API key. Free checks work without one.",
-          "isRequired": false,
+          "description": "Your RuralCheck API key, from a paid plan.",
+          "isRequired": true,
           "isSecret": true
         }
       ]

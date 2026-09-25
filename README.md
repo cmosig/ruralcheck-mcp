@@ -33,24 +33,28 @@ measured finely enough, and `check_coverage` says whether a point is one of them
 
 ## Tools
 
-| Tool | Key needed | What it does |
+Every tool needs an API key from a paid RuralCheck plan. Keys are made on your
+account page. Without one a client can still connect and list the tools.
+
+| Tool | Spends credit | What it does |
 |---|---|---|
 | `find_place` | no | A village or town name to coordinates. Street addresses are not searchable. |
 | `check_coverage` | no | Whether a point can be analysed, and how finely its ground is measured. |
 | `list_checks` | no | Every check, with its price as a share of one credit. |
 | `quote_cost` | no | What a set of checks would cost and how long it would take, without running it. |
-| `analyse_plot` | yes | Runs the checks you name for one point and returns the results. |
-| `get_report` | yes | Fetches a report that took longer than one tool call waits. |
+| `analyse_plot` | depends on the checks | Runs the checks you name for one point and returns the results. |
+| `get_report` | no | Fetches a report that took longer than one tool call waits. |
 | `sample_report` | no | A real full report for a plot in the Black Forest, to see what each check returns. |
+
+Answers are JSON, returned as text: the figures, their caveats, and the
+attribution for the data behind them. Map outlines and pictures are left out.
 
 ## Prices
 
-Most checks are free. Terrain, noise, sun, solar, view, wind and access use the 5 m
-ground model and cost a share of a credit: noise alone is 0.15, and every check
-together is 1.0. If any check you asked for fails, the whole charge is refunded.
-`quote_cost` gives the price before you spend anything.
-
-API keys come with a paid RuralCheck plan and are made on your account page.
+Most checks spend no credit. Terrain, noise, sun, solar, view, wind and access use
+the 5 m ground model and spend a share of a credit: noise alone is 0.15, and every
+check together is 1.0. If any check you asked for fails, the whole charge is
+refunded. `quote_cost` gives the price before you spend anything.
 
 ## Use it
 
@@ -92,7 +96,7 @@ keeps none.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `RURALCHECK_API_KEY` | none | Your key, for stdio. The free tools work without it. |
+| `RURALCHECK_API_KEY` | none | Your key, for stdio. Required. |
 | `RURALCHECK_BASE_URL` | `https://ruralcheck.eu` | Where the API is. |
 | `RURALCHECK_WAIT_S` | `45` | How long one tool call waits for a report before handing back an id. |
 
@@ -108,9 +112,14 @@ python -m venv .venv && .venv/bin/pip install -e . pytest
 .venv/bin/python -m pytest
 ```
 
-The tests run against a fake API and need no network. The HTTP contract they
-assume lives under `/api/v1/` on ruralcheck.eu: `checks`, `cost`, `coverage`,
-`search`, `sample`, and `reports` with a long-polling `?wait=`.
+`tests/test_server.py` runs against a fake API and needs no network.
+`tests/test_live.py` drives every tool against a real instance and is skipped
+unless `RURALCHECK_LIVE_URL` and `RURALCHECK_API_KEY` are set. Run it whenever the
+API changes. It spends 0.15 of a credit.
+
+The contract lives under `/api/v1/` on ruralcheck.eu: `checks`, `cost`,
+`coverage`, `search`, `sample`, and `reports` with a long-polling `?wait=` and
+`?drawing=false`.
 
 ## Licence
 
