@@ -19,7 +19,7 @@ import httpx
 from mcp.server.mcpserver import Context, MCPServer
 from mcp.server.mcpserver.exceptions import ToolError
 from mcp_types import ToolAnnotations
-from pydantic import Field
+from pydantic import BaseModel, Field
 
 from . import __version__
 from .api import APIError, Config, RuralCheck
@@ -34,6 +34,10 @@ Typical flow: find_place to turn a name into coordinates, check_coverage to see
 whether the point is served, then analyse_plot. Ask only for the checks the
 question needs, from list_checks: a whole report is large. Every tool needs a paid
 RuralCheck plan, which includes every check with no limit on reports.
+
+An estate agent on the Professional plan can send their listings with
+upload_listings: each becomes a saved plot with a full report and a client link,
+run one after another. Follow the upload with get_listing_upload.
 
 Everything is computed from public data and is an estimate, not a survey, a
 valuation or legal advice. Pass on the caveats each check carries.
@@ -197,6 +201,55 @@ async def sample_report(ctx: Context, checks: CHECKS = None) -> str:
                                   if k in wanted}
         return _shape(payload)
     return await _call(ctx, run)
+
+
+class Listing(BaseModel):
+    """One property for sale, as the agent knows it."""
+    name: str = Field("", max_length=200, description="What the agent calls the listing.")
+    lat: float | None = Field(None, description="Latitude in degrees (WGS84).")
+    lon: float | None = Field(None, description="Longitude in degrees (WGS84).")
+    reference: str = Field("", max_length=255, description="The agent's own reference.")
+
+
+@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True, idempotentHint=False),
+          structured_output=False)
+async def upload_listings(
+    listings: Annotated[list[Listing], Field(min_length=1, max_length=2000, description=(
+        "The properties, each with name, lat, lon and reference."))],
+    ctx: Context,
+    name: Annotated[str, Field(max_length=200, description="A name for this upload.")] = "",
+) -> str:
+    """Send an estate agent's listings to RuralCheck. Professional plan.
+
+    Each listing becomes a saved plot with a full report and a client link the
+    agent can put in the listing. Reports run one after another on the server,
+    about half a minute each, and wait for anyone using the site, so this returns
+    at once with the upload's id. Follow it with get_listing_upload. Up to 100
+    listings run from one upload. A listing that is not run comes back with the
+    reason, for example no position, outside the area covered, or past the limit.
+    A listing already saved with a current report is not run again. One upload
+    runs at a time on an account.
+    """
+    items = [x.model_dump() for x in listings]
+    return await _call(ctx, lambda api: api.send_listings(items, name))
+
+
+@mcp.tool(annotations=READ_ONLY, structured_output=False)
+async def get_listing_upload(
+    upload_id: Annotated[int, Field(ge=1, description="The id upload_listings returned.")],
+    ctx: Context,
+) -> str:
+    """An upload's progress: for each listing its status, its client link once its
+    report is done, or the reason it was not run. `status` is "done" when nothing
+    is left to run.
+    """
+    return await _call(ctx, lambda api: api.listing_upload(upload_id))
+
+
+@mcp.tool(annotations=READ_ONLY, structured_output=False)
+async def list_listing_uploads(ctx: Context) -> str:
+    """The account's listing uploads, newest first, with how far each has got."""
+    return await _call(ctx, lambda api: api.listing_uploads())
 
 
 async def _wait(api: RuralCheck, report_id: str, ctx: Context, deadline: float) -> dict:

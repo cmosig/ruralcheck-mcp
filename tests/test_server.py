@@ -64,10 +64,12 @@ def test_tools_are_listed_with_honest_hints():
             return {t.name: t for t in (await client.list_tools()).tools}
     tools = run(go())
     assert set(tools) == {"find_place", "check_coverage", "list_checks",
-                          "analyse_plot", "get_report", "sample_report"}
-    # analyse_plot spends credits, so it must not claim to be read-only.
-    assert tools["analyse_plot"].annotations.read_only_hint is False
-    assert all(tools[n].annotations.read_only_hint for n in tools if n != "analyse_plot")
+                          "analyse_plot", "get_report", "sample_report",
+                          "upload_listings", "get_listing_upload", "list_listing_uploads"}
+    # These two start work on the server, so they must not claim to be read-only.
+    starts = {"analyse_plot", "upload_listings"}
+    assert all(tools[n].annotations.read_only_hint is False for n in starts)
+    assert all(tools[n].annotations.read_only_hint for n in tools if n not in starts)
 
 
 def test_report_finished_in_one_call():
@@ -145,12 +147,53 @@ def test_every_tool_needs_a_key_and_says_so():
     args = {"find_place": {"query": "Furtwangen"}, "check_coverage": {"lat": 48.0, "lon": 8.2},
             "list_checks": {},
             "analyse_plot": {"lat": 48.0, "lon": 8.2}, "get_report": {"report_id": "abc123"},
-            "sample_report": {}}
+            "sample_report": {}, "upload_listings": {"listings": [{"lat": 36.6, "lon": -4.7}]},
+            "get_listing_upload": {"upload_id": 3}, "list_listing_uploads": {}}
     for tool, a in args.items():
         transport, seen = fake_api({})
         err, text = run(call(transport, tool, a, key=None))
         assert err and "paid plan" in text, (tool, text)
         assert not seen, f"{tool} reached the API without a key"
+
+
+UPLOAD = {"id": 3, "name": "May", "status": "running", "total": 2, "done": 0, "to_run": 1,
+          "not_run": 1, "page": "https://ruralcheck.eu/listings/3", "listings": [
+              {"position": 1, "name": "Finca", "reference": "C-1", "lat": 36.6, "lon": -4.7,
+               "status": "waiting", "note": "", "plot_id": None, "client_link": None},
+              {"position": 2, "name": "Plot", "reference": "C-2", "lat": None, "lon": None,
+               "status": "not_run", "note": "No position given.", "plot_id": None,
+               "client_link": None}]}
+
+
+def test_listings_are_sent_and_followed():
+    transport, seen = fake_api({("POST", "/api/v1/listings"): (202, UPLOAD),
+                                ("GET", "/api/v1/listings/3"): (200, UPLOAD),
+                                ("GET", "/api/v1/listings"): (200, {"uploads": [UPLOAD]})})
+    err, out = run(call(transport, "upload_listings", {"name": "May", "listings": [
+        {"name": "Finca", "lat": 36.6, "lon": -4.7, "reference": "C-1"},
+        {"name": "Plot", "reference": "C-2"}]}))
+    assert not err and out["id"] == 3
+    sent = json.loads(seen[0].content)
+    assert sent["name"] == "May" and sent["listings"][1] == {
+        "name": "Plot", "lat": None, "lon": None, "reference": "C-2"}
+    err, out = run(call(transport, "get_listing_upload", {"upload_id": 3}))
+    assert not err and out["listings"][1]["note"] == "No position given."
+    err, out = run(call(transport, "list_listing_uploads", {}))
+    assert not err and out["uploads"][0]["id"] == 3
+
+
+def test_a_second_upload_or_the_wrong_plan_is_told_why():
+    for status, detail in [(409, "An upload is still running on this account."),
+                           (402, "Uploading listings comes with the Professional plan.")]:
+        transport, _ = fake_api({("POST", "/api/v1/listings"): (status, {"detail": detail})})
+        err, text = run(call(transport, "upload_listings", {"listings": [{"lat": 1, "lon": 2}]}))
+        assert err and detail in text, text
+
+
+def test_an_upload_id_is_a_number():
+    transport, seen = fake_api({})
+    err, _ = run(call(transport, "get_listing_upload", {"upload_id": "../account"}))
+    assert err and not seen
 
 
 def test_key_is_sent():
