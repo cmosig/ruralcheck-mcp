@@ -44,6 +44,9 @@ reports. Without one a client can still connect and list the tools.
 | `analyse_plot` | Runs the checks you name for one point and returns the results. |
 | `get_report` | Fetches a report that took longer than one tool call waits. |
 | `sample_report` | A real full report for a plot in the Black Forest, to see what each check returns. |
+| `upload_listings` | Professional plan. Sends an agent's listings: each becomes a saved plot with a full report and a client link, run one after another. |
+| `get_listing_upload` | An upload's progress: each listing's status, its client link, or why it was not run. |
+| `list_listing_uploads` | The account's uploads and how far each has got. |
 
 Answers are JSON, returned as text: the figures, their caveats, and the
 attribution for the data behind them. Map outlines and pictures are left out.

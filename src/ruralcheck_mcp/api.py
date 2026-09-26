@@ -105,6 +105,23 @@ class RuralCheck:
                                  timeout=wait_s + self.config.timeout_s))[1]
 
 
+    # Listing uploads: a Professional account's listings, each run as a full report
+    # with a saved plot and a client link, one after another on the server.
+
+    async def send_listings(self, listings: list[dict], name: str = "") -> dict:
+        payload: dict[str, Any] = {"listings": listings}
+        if name:
+            payload["name"] = name
+        return (await self._call("POST", "/api/v1/listings", json=payload, ok=(202,)))[1]
+
+    async def listing_upload(self, upload_id: int) -> dict:
+        # An int from the tool's own schema, so nothing but digits reaches the path.
+        return (await self._call("GET", f"/api/v1/listings/{int(upload_id)}"))[1]
+
+    async def listing_uploads(self) -> dict:
+        return (await self._call("GET", "/api/v1/listings"))[1]
+
+
 _REPORT_ID = re.compile(r"[A-Za-z0-9]{1,64}")
 
 
@@ -124,7 +141,7 @@ def _explain(status: int, detail: str | None) -> str:
         402: "This account's plan does not include this.",
         403: "This account may not do that.",
         404: "Not found.",
-        409: "RuralCheck does not analyse this point.",
+        409: "RuralCheck cannot do that right now.",
         422: "The request was not valid.",
         429: "Too many requests. Wait a minute and try again.",
         503: "RuralCheck is busy or restarting. Try again shortly.",

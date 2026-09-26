@@ -64,3 +64,29 @@ def test_the_contract_holds():
     assert not any(k in json.dumps(report["results"]) for k in ('"outlines"', '"slope_image"'))
 
     assert e7 and "no_such_check" in bad
+
+
+def test_listings_go_in_and_come_back_with_their_reasons():
+    """Needs a key on the Professional plan. Sends two listings that will not run,
+    so the test saves no plot and runs no report: one without a position and one
+    out at sea."""
+    import time
+    (e1, up), = calls(("upload_listings", {"name": "ruralcheck-mcp live test", "listings": [
+        {"name": "No position", "reference": "LIVE-1"},
+        {"name": "At sea", "lat": 45.0, "lon": -20.0, "reference": "LIVE-2"}]}))
+    if e1 and "still running" in up:
+        pytest.skip("this account has an upload running")
+    assert not e1, up
+    assert up["total"] == 2 and up["page"].endswith(f"/listings/{up['id']}")
+    for _ in range(30):
+        (e2, got), (e3, uploads) = calls(("get_listing_upload", {"upload_id": up["id"]}),
+                                         ("list_listing_uploads", {}))
+        assert not (e2 or e3), (got, uploads)
+        if got["status"] == "done":
+            break
+        time.sleep(1)
+    assert got["status"] == "done", got
+    notes = {x["reference"]: (x["status"], x["note"]) for x in got["listings"]}
+    assert notes["LIVE-1"] == ("not_run", "No position given.")
+    assert notes["LIVE-2"][0] == "not_run" and notes["LIVE-2"][1]
+    assert up["id"] in [u["id"] for u in uploads["uploads"]]
