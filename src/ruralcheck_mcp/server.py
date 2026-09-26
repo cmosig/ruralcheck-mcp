@@ -41,6 +41,11 @@ run one after another. Follow the upload with get_listing_upload.
 
 Everything is computed from public data and is an estimate, not a survey, a
 valuation or legal advice. Pass on the caveats each check carries.
+
+My plots is the account's own list of kept reports. save_plot keeps a report that
+ran every check. Plots can be put in folders, renamed and given a note. delete_plot
+moves a plot to the Trash, where it can be restored for 30 days. Nothing here
+deletes a plot for good. That happens only on the website, or 30 days later.
 """
 
 LAT = Annotated[float, Field(ge=27, le=72, description="Latitude in degrees (WGS84).")]
@@ -250,6 +255,131 @@ async def get_listing_upload(
 async def list_listing_uploads(ctx: Context) -> str:
     """The account's listing uploads, newest first, with how far each has got."""
     return await _call(ctx, lambda api: api.listing_uploads())
+
+
+# ---------------------------------------------------------------- My plots
+
+PLOT_ID = Annotated[int, Field(ge=1, description="A plot id from list_plots or save_plot.")]
+FOLDER_ID = Annotated[int, Field(ge=1, description="A folder id from list_folders.")]
+FOLDER_NAME = Annotated[str, Field(min_length=1, max_length=60, description="The folder's name.")]
+
+
+def _hints(read_only: bool = False, destructive: bool = False, idempotent: bool = True):
+    # openWorldHint is false: these tools touch only the reader's own account.
+    return ToolAnnotations(readOnlyHint=read_only, destructiveHint=destructive,
+                           idempotentHint=idempotent, openWorldHint=False)
+
+
+@mcp.tool(annotations=_hints(read_only=True), structured_output=False)
+async def list_plots(
+    ctx: Context,
+    folder_id: Annotated[int | None, Field(ge=1, description="Only the plots in this folder.")] = None,
+    in_trash: Annotated[bool, Field(description="True lists the Trash instead.")] = False,
+) -> str:
+    """The plots this account keeps, newest first, with the key figure of each check,
+    and the account's folders.
+
+    Plots in the Trash are left out unless in_trash is true. Each one there has a
+    `deleted_after` date. It can be restored until then.
+    """
+    return await _call(ctx, lambda api: api.plots(folder_id, in_trash))
+
+
+@mcp.tool(annotations=_hints(read_only=True), structured_output=False)
+async def get_plot(plot_id: PLOT_ID, ctx: Context) -> str:
+    """One kept plot with its report, as it was when it was kept.
+
+    `report.current` is false when the checks have changed since. Running
+    analyse_plot again and keeping the result brings it up to date.
+    """
+    async def run(api: RuralCheck) -> dict:
+        body = await api.plot(plot_id)
+        body["results"] = body.pop("modules", None) or {}
+        return body
+    return await _call(ctx, run)
+
+
+@mcp.tool(annotations=_hints(), structured_output=False)
+async def save_plot(
+    report_id: Annotated[str, Field(max_length=64, description="The id analyse_plot returned.")],
+    ctx: Context,
+    name: Annotated[str | None, Field(max_length=80, description="What to call the plot. "
+                                      "Defaults to the nearest village.")] = None,
+    folder_id: Annotated[int | None, Field(ge=1, description="A folder to put it in.")] = None,
+) -> str:
+    """Keep a finished report in My plots.
+
+    Only a report that ran every check can be kept, so call analyse_plot without
+    naming checks first. Keeping the same point again replaces its report, keeps its
+    name and note, and takes it out of the Trash if it was there.
+    """
+    return await _call(ctx, lambda api: api.keep(report_id, name, folder_id))
+
+
+@mcp.tool(annotations=_hints(destructive=True), structured_output=False)
+async def update_plot(
+    plot_id: PLOT_ID,
+    ctx: Context,
+    name: Annotated[str | None, Field(max_length=80, description="A new name.")] = None,
+    note: Annotated[str | None, Field(max_length=4000, description="The note, which "
+                                      "replaces the one there.")] = None,
+) -> str:
+    """Rename a kept plot or replace its note. A plot in the Trash must be restored first."""
+    fields = {k: v for k, v in (("name", name), ("note", note)) if v is not None}
+    if not fields:
+        raise ToolError("Give a new name, a note, or both.")
+    return await _call(ctx, lambda api: api.edit_plot(plot_id, fields))
+
+
+@mcp.tool(annotations=_hints(), structured_output=False)
+async def file_plot(
+    plot_id: PLOT_ID,
+    ctx: Context,
+    folder_id: Annotated[int | None, Field(ge=1, description="The folder. Leave out to take "
+                                           "the plot out of its folder.")] = None,
+) -> str:
+    """Put a kept plot in a folder, or take it out of the one it is in."""
+    return await _call(ctx, lambda api: api.edit_plot(plot_id, {"folder_id": folder_id}))
+
+
+@mcp.tool(annotations=_hints(destructive=True), structured_output=False)
+async def delete_plot(plot_id: PLOT_ID, ctx: Context) -> str:
+    """Move a kept plot to the Trash.
+
+    It can be restored with restore_plot until its `deleted_after` date, 30 days on,
+    and is then removed for good. Nothing through this server deletes a plot at once.
+    """
+    return await _call(ctx, lambda api: api.trash(plot_id))
+
+
+@mcp.tool(annotations=_hints(), structured_output=False)
+async def restore_plot(plot_id: PLOT_ID, ctx: Context) -> str:
+    """Take a plot out of the Trash, back into its folder if that still exists."""
+    return await _call(ctx, lambda api: api.restore(plot_id))
+
+
+@mcp.tool(annotations=_hints(read_only=True), structured_output=False)
+async def list_folders(ctx: Context) -> str:
+    """The account's folders, each with how many plots are in it."""
+    return await _call(ctx, lambda api: api.folders())
+
+
+@mcp.tool(annotations=_hints(idempotent=False), structured_output=False)
+async def create_folder(name: FOLDER_NAME, ctx: Context) -> str:
+    """Make a folder for kept plots. Each name can be used once, whatever the case."""
+    return await _call(ctx, lambda api: api.new_folder(name))
+
+
+@mcp.tool(annotations=_hints(), structured_output=False)
+async def rename_folder(folder_id: FOLDER_ID, name: FOLDER_NAME, ctx: Context) -> str:
+    """Rename a folder."""
+    return await _call(ctx, lambda api: api.rename_folder(folder_id, name))
+
+
+@mcp.tool(annotations=_hints(destructive=True), structured_output=False)
+async def delete_folder(folder_id: FOLDER_ID, ctx: Context) -> str:
+    """Delete a folder. Its plots stay in My plots, in no folder."""
+    return await _call(ctx, lambda api: api.remove_folder(folder_id))
 
 
 async def _wait(api: RuralCheck, report_id: str, ctx: Context, deadline: float) -> dict:

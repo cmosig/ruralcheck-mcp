@@ -100,10 +100,63 @@ class RuralCheck:
         # key: "../../account" would ask the site for a page that is not the API.
         if not _REPORT_ID.fullmatch(report_id):
             raise APIError(404, "There is no report with this id.")
+        # 202 while it runs, with what it has so far: an answer, not a refusal.
+        # Treated as one, any report longer than one poll failed the tool call.
         return (await self._call("GET", f"/api/v1/reports/{report_id}",
-                                 params=_report_params(wait_s),
+                                 params=_report_params(wait_s), ok=(200, 202),
                                  timeout=wait_s + self.config.timeout_s))[1]
 
+    # My plots: the plots the account keeps, its folders and the Trash. Every id
+    # goes into a path sent with the reader's key, so each is checked to be a
+    # whole number before it gets there.
+
+    async def plots(self, folder_id: int | None = None, in_trash: bool = False) -> dict:
+        params: dict[str, Any] = {"in_trash": "true" if in_trash else "false"}
+        if folder_id is not None:
+            params["folder_id"] = _id(folder_id, "folder")
+        return (await self._call("GET", "/api/v1/plots", params=params))[1]
+
+    async def plot(self, plot_id: int) -> dict:
+        return (await self._call("GET", f"/api/v1/plots/{_id(plot_id, 'plot')}",
+                                 params={"drawing": "false"}))[1]
+
+    async def keep(self, report_id: str, name: str | None = None,
+                   folder_id: int | None = None) -> dict:
+        if not _REPORT_ID.fullmatch(report_id):
+            raise APIError(404, "There is no report with this id.")
+        payload: dict[str, Any] = {"report_id": report_id}
+        if name:
+            payload["name"] = name
+        if folder_id is not None:
+            payload["folder_id"] = _id(folder_id, "folder")
+        return (await self._call("POST", "/api/v1/plots", json=payload))[1]
+
+    async def edit_plot(self, plot_id: int, fields: dict[str, Any]) -> dict:
+        """PATCH the plot. A `folder_id` of None in `fields` is sent as null, which
+        takes the plot out of its folder. A field left out is left as it is."""
+        if fields.get("folder_id") is not None:
+            fields = {**fields, "folder_id": _id(fields["folder_id"], "folder")}
+        return (await self._call("PATCH", f"/api/v1/plots/{_id(plot_id, 'plot')}",
+                                 json=fields))[1]
+
+    async def trash(self, plot_id: int) -> dict:
+        return (await self._call("DELETE", f"/api/v1/plots/{_id(plot_id, 'plot')}"))[1]
+
+    async def restore(self, plot_id: int) -> dict:
+        return (await self._call("POST", f"/api/v1/plots/{_id(plot_id, 'plot')}/restore"))[1]
+
+    async def folders(self) -> dict:
+        return (await self._call("GET", "/api/v1/folders"))[1]
+
+    async def new_folder(self, name: str) -> dict:
+        return (await self._call("POST", "/api/v1/folders", json={"name": name}))[1]
+
+    async def rename_folder(self, folder_id: int, name: str) -> dict:
+        return (await self._call("PATCH", f"/api/v1/folders/{_id(folder_id, 'folder')}",
+                                 json={"name": name}))[1]
+
+    async def remove_folder(self, folder_id: int) -> dict:
+        return (await self._call("DELETE", f"/api/v1/folders/{_id(folder_id, 'folder')}"))[1]
 
     # Listing uploads: a Professional account's listings, each run as a full report
     # with a saved plot and a client link, one after another on the server.
@@ -120,6 +173,13 @@ class RuralCheck:
 
     async def listing_uploads(self) -> dict:
         return (await self._call("GET", "/api/v1/listings"))[1]
+
+
+def _id(value: Any, what: str) -> int:
+    """A plot or folder id as a positive whole number, or a 404 before any request."""
+    if isinstance(value, bool) or not isinstance(value, int) or value < 1:
+        raise APIError(404, f"There is no {what} with this id.")
+    return value
 
 
 _REPORT_ID = re.compile(r"[A-Za-z0-9]{1,64}")
@@ -141,7 +201,9 @@ def _explain(status: int, detail: str | None) -> str:
         402: "This account's plan does not include this.",
         403: "This account may not do that.",
         404: "Not found.",
-        409: "RuralCheck cannot do that right now.",
+        # analyse_plot reads a 409 as an answer (the point is not served), so one
+        # that reaches here is a plot or folder refused, and `detail` says why.
+        409: "RuralCheck could not do this.",
         422: "The request was not valid.",
         429: "Too many requests. Wait a minute and try again.",
         503: "RuralCheck is busy or restarting. Try again shortly.",
