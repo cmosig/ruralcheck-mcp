@@ -5,13 +5,17 @@ Skipped unless both are set:
     RURALCHECK_LIVE_URL   e.g. http://127.0.0.1:8046 or https://ruralcheck.eu
     RURALCHECK_API_KEY    a key on that instance
 Run it after any change to /api/v1 on the RuralCheck side, against the preview
-that carries the change. Runs one noise check.
+that carries the change. Runs one noise check and one whole report.
+
+The plot round trip keeps one plot on the account and leaves it in the Trash,
+where the daily purge removes it 30 days later.
 """
 from __future__ import annotations
 
 import asyncio
 import json
 import os
+import uuid
 
 import pytest
 from mcp.client import Client
@@ -90,3 +94,54 @@ def test_listings_go_in_and_come_back_with_their_reasons():
     assert notes["LIVE-1"] == ("not_run", "No position given.")
     assert notes["LIVE-2"][0] == "not_run" and notes["LIVE-2"][1]
     assert up["id"] in [u["id"] for u in uploads["uploads"]]
+
+
+def test_a_plot_is_kept_filed_trashed_and_restored():
+    # One report at a time per account, so the whole one finishes first.
+    ((e1, whole),) = calls(("analyse_plot", PLOT))
+    assert not e1, whole
+    while whole["status"] == "running":
+        ((e, whole),) = calls(("get_report", {"report_id": whole["id"]}))
+        assert not e, whole
+    assert whole["status"] == "done", whole
+    ((e2, part),) = calls(("analyse_plot", {**PLOT, "checks": ["noise"]}))
+    assert not e2 and part["status"] == "done", part
+
+    folder_name = f"Live test {uuid.uuid4().hex[:6]}"
+    (e3, refused), (e4, kept), (e5, folder) = calls(
+        ("save_plot", {"report_id": part["id"]}),
+        ("save_plot", {"report_id": whole["id"]}),
+        ("create_folder", {"name": folder_name}),
+    )
+    assert e3 and "every check" in refused, refused
+    assert not e4 and not e5, (kept, folder)
+    pid, fid = kept["id"], folder["id"]
+
+    steps = calls(
+        ("file_plot", {"plot_id": pid, "folder_id": fid}),
+        ("list_plots", {"folder_id": fid}),
+        ("get_plot", {"plot_id": pid}),
+        ("delete_plot", {"plot_id": pid}),
+        ("list_plots", {"folder_id": fid}),
+        ("list_plots", {"in_trash": True}),
+        ("update_plot", {"plot_id": pid, "note": "x"}),
+        ("restore_plot", {"plot_id": pid}),
+        ("delete_folder", {"folder_id": fid}),
+        ("get_plot", {"plot_id": pid}),
+        ("delete_plot", {"plot_id": pid}),
+    )
+    (_, filed), (_, in_folder), (_, got), (_, binned), (_, folder_after), (_, trash), \
+        (e_edit, edit), (_, back), (_, gone), (_, loose), (_, last) = steps
+    assert not any(e for i, (e, _) in enumerate(steps) if i != 6), steps
+    assert filed["folder"]["id"] == fid
+    assert [p["id"] for p in in_folder["plots"]] == [pid]
+    assert "noise" in got["results"] and got["report"]["every_check"]
+    assert binned["in_trash"] and binned["deleted_after"]
+    assert folder_after["plots"] == []
+    assert pid in [p["id"] for p in trash["plots"]]
+    assert e_edit and "Restore it first" in edit, edit
+    assert back["in_trash"] is False and back["folder"]["id"] == fid
+    assert gone["removed"] is True
+    # The folder went, and the plot stayed, in no folder.
+    assert loose["folder"] is None and not loose["in_trash"]
+    assert last["in_trash"]

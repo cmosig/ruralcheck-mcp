@@ -58,6 +58,14 @@ def run(coro):
     return asyncio.run(coro)
 
 
+PLOT_TOOLS = {"list_plots", "get_plot", "save_plot", "update_plot", "file_plot",
+              "delete_plot", "restore_plot", "list_folders", "create_folder",
+              "rename_folder", "delete_folder"}
+# The tools that change something, on the server or in the account.
+WRITES = {"analyse_plot", "save_plot", "update_plot", "file_plot", "delete_plot",
+          "restore_plot", "create_folder", "rename_folder", "delete_folder"}
+
+
 def test_tools_are_listed_with_honest_hints():
     async def go():
         async with Client(server.mcp) as client:
@@ -65,11 +73,16 @@ def test_tools_are_listed_with_honest_hints():
     tools = run(go())
     assert set(tools) == {"find_place", "check_coverage", "list_checks",
                           "analyse_plot", "get_report", "sample_report",
-                          "upload_listings", "get_listing_upload", "list_listing_uploads"}
-    # These two start work on the server, so they must not claim to be read-only.
-    starts = {"analyse_plot", "upload_listings"}
+                          "upload_listings", "get_listing_upload", "list_listing_uploads"} | PLOT_TOOLS
+    # These start work on the server or change something, so they must not claim
+    # to be read-only.
+    starts = WRITES | {"upload_listings"}
     assert all(tools[n].annotations.read_only_hint is False for n in starts)
     assert all(tools[n].annotations.read_only_hint for n in tools if n not in starts)
+    # What loses something the reader wrote says so, so a client can ask first.
+    for name in ("delete_plot", "delete_folder", "update_plot"):
+        assert tools[name].annotations.destructive_hint is True, name
+    assert "Trash" in tools["delete_plot"].description
 
 
 def test_report_finished_in_one_call():
@@ -87,7 +100,9 @@ def test_report_still_running_is_polled_to_the_end():
     polls = iter([{"id": "abc123", "status": "running", "progress": 0.5}, DONE])
     transport, seen = fake_api({
         ("POST", "/api/v1/reports"): (202, {"id": "abc123", "status": "running"}),
-        ("GET", "/api/v1/reports/abc123"): lambda r: (200, next(polls)),
+        # The API answers 202 while the report runs.
+        ("GET", "/api/v1/reports/abc123"): lambda r: (
+            (lambda b: (202 if b["status"] == "running" else 200, b))(next(polls))),
     })
     err, out = run(call(transport, "analyse_plot", {"lat": 48.0, "lon": 8.2}))
     assert not err and out["status"] == "done"
@@ -148,7 +163,13 @@ def test_every_tool_needs_a_key_and_says_so():
             "list_checks": {},
             "analyse_plot": {"lat": 48.0, "lon": 8.2}, "get_report": {"report_id": "abc123"},
             "sample_report": {}, "upload_listings": {"listings": [{"lat": 36.6, "lon": -4.7}]},
-            "get_listing_upload": {"upload_id": 3}, "list_listing_uploads": {}}
+            "get_listing_upload": {"upload_id": 3}, "list_listing_uploads": {},
+            "list_plots": {}, "get_plot": {"plot_id": 1},
+            "save_plot": {"report_id": "abc123"}, "update_plot": {"plot_id": 1, "name": "x"},
+            "file_plot": {"plot_id": 1, "folder_id": 2}, "delete_plot": {"plot_id": 1},
+            "restore_plot": {"plot_id": 1}, "list_folders": {},
+            "create_folder": {"name": "Spain"}, "rename_folder": {"folder_id": 2, "name": "x"},
+            "delete_folder": {"folder_id": 2}}
     for tool, a in args.items():
         transport, seen = fake_api({})
         err, text = run(call(transport, tool, a, key=None))
@@ -206,6 +227,97 @@ def test_http_callers_key_wins_over_the_environment():
     ctx = SimpleNamespace(headers={"authorization": "Bearer rc_caller"})
     api = server._client(ctx)
     assert api._http.headers["Authorization"] == "Bearer rc_caller"
+
+
+PLOT = {"id": 5, "name": "Near Testby", "note": "", "lat": 48.0, "lon": 8.2,
+        "folder": None, "in_trash": False, "trashed_at": None, "deleted_after": None,
+        "report": {"made": "2026-09-26", "every_check": True, "current": True}}
+
+
+def test_a_report_is_kept_and_filed():
+    transport, seen = fake_api({
+        ("POST", "/api/v1/plots"): (200, {**PLOT, "created": True}),
+        ("PATCH", "/api/v1/plots/5"): (200, {**PLOT, "folder": {"id": 2, "name": "Spain"}}),
+    })
+    err, out = run(call(transport, "save_plot", {"report_id": "abc123", "folder_id": 2}))
+    assert not err and out["created"]
+    assert json.loads(seen[0].content) == {"report_id": "abc123", "folder_id": 2}
+    err, out = run(call(transport, "file_plot", {"plot_id": 5, "folder_id": 2}))
+    assert not err and out["folder"]["id"] == 2
+    assert json.loads(seen[1].content) == {"folder_id": 2}
+
+
+def test_taking_a_plot_out_of_its_folder_sends_null():
+    transport, seen = fake_api({("PATCH", "/api/v1/plots/5"): (200, PLOT)})
+    err, _ = run(call(transport, "file_plot", {"plot_id": 5}))
+    assert not err and json.loads(seen[0].content) == {"folder_id": None}
+
+
+def test_renaming_sends_only_what_changes():
+    transport, seen = fake_api({("PATCH", "/api/v1/plots/5"): (200, PLOT)})
+    err, _ = run(call(transport, "update_plot", {"plot_id": 5, "note": "south slope"}))
+    assert not err and json.loads(seen[0].content) == {"note": "south slope"}
+    err, text = run(call(transport, "update_plot", {"plot_id": 5}))
+    assert err and "name" in text and len(seen) == 1
+
+
+def test_delete_moves_to_the_trash_and_restore_brings_it_back():
+    binned = {**PLOT, "in_trash": True, "deleted_after": "2026-10-26"}
+    transport, seen = fake_api({
+        ("DELETE", "/api/v1/plots/5"): (200, binned),
+        ("POST", "/api/v1/plots/5/restore"): (200, PLOT),
+        ("GET", "/api/v1/plots"): (200, {"plots": [binned], "folders": [], "trash_days": 30}),
+    })
+    err, out = run(call(transport, "delete_plot", {"plot_id": 5}))
+    assert not err and out["in_trash"] and out["deleted_after"]
+    err, out = run(call(transport, "list_plots", {"in_trash": True}))
+    assert not err and out["plots"][0]["id"] == 5
+    assert seen[1].url.params["in_trash"] == "true"
+    err, out = run(call(transport, "restore_plot", {"plot_id": 5}))
+    assert not err and out["in_trash"] is False
+    # Nothing this server sends deletes a plot for good.
+    assert [r.method for r in seen] == ["DELETE", "GET", "POST"]
+    assert all("forever" not in r.url.path and not r.url.path.endswith("/trash") for r in seen)
+
+
+def test_a_kept_report_comes_back_as_results_without_drawing():
+    transport, seen = fake_api({("GET", "/api/v1/plots/5"): (
+        200, {**PLOT, "modules": {"flood": {"available": True}}, "attribution": ["x"]})})
+    err, out = run(call(transport, "get_plot", {"plot_id": 5}))
+    assert not err and out["results"] == {"flood": {"available": True}} and "modules" not in out
+    assert seen[0].url.params["drawing"] == "false"
+
+
+def test_folders():
+    transport, seen = fake_api({
+        ("GET", "/api/v1/folders"): (200, {"folders": [{"id": 2, "name": "Spain", "plots": 1}]}),
+        ("POST", "/api/v1/folders"): (200, {"id": 3, "name": "France", "plots": 0}),
+        ("PATCH", "/api/v1/folders/3"): (200, {"id": 3, "name": "Lot", "plots": 0}),
+        ("DELETE", "/api/v1/folders/3"): (200, {"removed": True}),
+    })
+    assert run(call(transport, "list_folders", {}))[1]["folders"][0]["name"] == "Spain"
+    assert run(call(transport, "create_folder", {"name": "France"}))[1]["id"] == 3
+    assert run(call(transport, "rename_folder", {"folder_id": 3, "name": "Lot"}))[1]["name"] == "Lot"
+    assert run(call(transport, "delete_folder", {"folder_id": 3}))[1]["removed"]
+    assert json.loads(seen[1].content) == {"name": "France"}
+
+
+def test_a_plot_or_folder_id_is_a_number():
+    transport, seen = fake_api({})
+    for tool, args in (("get_plot", {"plot_id": "../account"}), ("delete_plot", {"plot_id": 0}),
+                       ("file_plot", {"plot_id": 5, "folder_id": "1/../x"}),
+                       ("delete_folder", {"folder_id": -1}),
+                       ("save_plot", {"report_id": "../../x"})):
+        err, _ = run(call(transport, tool, args))
+        assert err, (tool, args)
+    assert not seen, [str(r.url) for r in seen]
+
+
+def test_a_refused_plot_says_why():
+    detail = "Only a report with every check can be kept. Ask for the report without naming checks."
+    transport, _ = fake_api({("POST", "/api/v1/plots"): (409, {"detail": detail})})
+    err, text = run(call(transport, "save_plot", {"report_id": "abc123"}))
+    assert err and "every check" in text and "analyse this point" not in text, text
 
 
 if __name__ == "__main__":

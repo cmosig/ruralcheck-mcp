@@ -36,6 +36,10 @@ measured finely enough, and `check_coverage` says whether a point is one of them
 Every tool needs a paid RuralCheck plan, which includes every check with no limit on
 reports. Without one a client can still connect and list the tools.
 
+Nothing here deletes a plot for good. A deleted plot goes to the Trash on the
+account, and is removed 30 days later or when the reader empties the Trash on the
+website.
+
 | Tool | What it does |
 |---|---|
 | `find_place` | A village or town name to coordinates. Street addresses are not searchable. |
@@ -47,6 +51,16 @@ reports. Without one a client can still connect and list the tools.
 | `upload_listings` | Professional plan. Sends an agent's listings: each becomes a saved plot with a full report and a client link, run one after another. |
 | `get_listing_upload` | An upload's progress: each listing's status, its client link, or why it was not run. |
 | `list_listing_uploads` | The account's uploads and how far each has got. |
+| `list_plots` | The plots the account keeps, with the key figure of each check. Or the Trash. |
+| `get_plot` | One kept plot with its report, as it was when it was kept. |
+| `save_plot` | Keeps a finished report in My plots. Only a report that ran every check. |
+| `update_plot` | Renames a kept plot or replaces its note. |
+| `file_plot` | Puts a kept plot in a folder, or takes it out of one. |
+| `delete_plot` | Moves a kept plot to the Trash. It can be restored for 30 days. |
+| `restore_plot` | Takes a plot out of the Trash. |
+| `list_folders` | The account's folders. |
+| `create_folder`, `rename_folder` | Makes or renames a folder. |
+| `delete_folder` | Deletes a folder. Its plots stay, in no folder. |
 
 Answers are JSON, returned as text: the figures, their caveats, and the
 attribution for the data behind them. Map outlines and pictures are left out.
@@ -125,8 +139,8 @@ unless `RURALCHECK_LIVE_URL` and `RURALCHECK_API_KEY` are set. Run it whenever t
 API changes.
 
 The contract lives under `/api/v1/` on ruralcheck.eu: `checks`, `coverage`,
-`search`, `sample`, and `reports` with a long-polling `?wait=` and
-`?drawing=false`.
+`search`, `sample`, `reports` with a long-polling `?wait=` and
+`?drawing=false`, and `plots` and `folders` for My plots.
 
 ## Licence
 
