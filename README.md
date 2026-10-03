@@ -20,10 +20,10 @@ back with its figure, its caveats and where it came from.
 | Group | Checks |
 |---|---|
 | Local area | municipality, nearest village and town, public transport, shops and services, lakes and rivers to swim in, phone signal and internet, drive times |
-| Land | land-register plot, paths across it and whether a road reaches it, slope and aspect, what the plot can see |
+| Land | land-register plot, paths across it and whether a road reaches it, terrain (slope and height), what the plot can see |
 | Hazards | river flooding, wildfire history, earthquake shaking, protected areas |
 | Living there | modelled road and rail noise, sun hours with the hills taken into account, solar yield, wind, night sky, snow, air quality, climate now and around 2050, woods |
-| Region | farmland prices, household income and population, visitor numbers |
+| Region | household income and population, visitor numbers |
 
 `list_checks` returns the current list with a description, price and time for each.
 
