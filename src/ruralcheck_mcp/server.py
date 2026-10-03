@@ -33,7 +33,9 @@ climate now and around 2050, drive times and more.
 Typical flow: find_place to turn a name into coordinates, check_coverage to see
 whether the point is served, then analyse_plot. Ask only for the checks the
 question needs, from list_checks: a whole report is large. Every tool needs a paid
-RuralCheck plan, which includes every check with no limit on reports.
+RuralCheck plan, which includes every check. An account can start one new report a
+minute, so ask for every check a question needs in one analyse_plot call; more than
+that is the Business plan.
 
 An estate agent on the Professional plan can send their listings with
 upload_listings: each becomes a saved plot with a full report and a client link,
@@ -166,6 +168,9 @@ async def analyse_plot(lat: LAT, lon: LON, ctx: Context, checks: CHECKS = None) 
 
     Checks a chosen one depends on run too and are returned with it. Most answers take a few seconds; if one runs longer than this
     call waits, the answer carries an id to pass to get_report.
+
+    An account can start one new report a minute, so name every check needed in
+    one call. Fetching a report with get_report does not count.
 
     Show the `attribution` lines to whoever reads the results: the data licences
     require it.

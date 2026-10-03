@@ -7,6 +7,10 @@ Skipped unless both are set:
 Run it after any change to /api/v1 on the RuralCheck side, against the preview
 that carries the change. Runs one noise check and one whole report.
 
+An account starts one new report a minute through the API (the owner's decision of
+2026-10-04), so the tests space their reports a minute apart and take about three
+minutes.
+
 The plot round trip keeps one plot on the account and leaves it in the Trash,
 where the daily purge removes it 30 days later.
 """
@@ -26,6 +30,22 @@ pytestmark = pytest.mark.skipif(not (LIVE and os.environ.get("RURALCHECK_API_KEY
 
 PLOT = {"lat": 48.015, "lon": 8.19}  # the sample report's plot, in the Black Forest
 
+_last_start = [0.0]
+
+
+def spaced():
+    """Wait until a new report may start: one a minute per account, counted from
+    when the last call that started one returned (started())."""
+    import time
+    gap = 62 - (time.monotonic() - _last_start[0])
+    if _last_start[0] and gap > 0:
+        time.sleep(gap)
+
+
+def started():
+    import time
+    _last_start[0] = time.monotonic()
+
 
 def calls(*steps):
     os.environ["RURALCHECK_BASE_URL"] = LIVE
@@ -43,6 +63,7 @@ def calls(*steps):
 
 
 def test_the_contract_holds():
+    spaced()
     (e1, checks), (e2, cov), (e4, place), (e5, sample), (e6, report), (e7, bad) = calls(
         ("list_checks", {}),
         ("check_coverage", PLOT),
@@ -51,6 +72,7 @@ def test_the_contract_holds():
         ("analyse_plot", {**PLOT, "checks": ["noise"]}),
         ("analyse_plot", {**PLOT, "checks": ["no_such_check"]}),
     )
+    started()
     assert not any((e1, e2, e4, e5, e6)), (checks, cov, place, sample, report)
 
     names = {c["name"] for c in checks["checks"]}
@@ -97,14 +119,22 @@ def test_listings_go_in_and_come_back_with_their_reasons():
 
 
 def test_a_plot_is_kept_filed_trashed_and_restored():
-    # One report at a time per account, so the whole one finishes first.
+    # One report at a time per account, so the whole one finishes first, and one new
+    # report a minute, so the second waits for that too.
+    spaced()
     ((e1, whole),) = calls(("analyse_plot", PLOT))
+    started()
     assert not e1, whole
     while whole["status"] == "running":
         ((e, whole),) = calls(("get_report", {"report_id": whole["id"]}))
         assert not e, whole
     assert whole["status"] == "done", whole
+    # A second report within the minute is refused, and the sentence says why.
+    ((e_soon, soon),) = calls(("analyse_plot", {**PLOT, "checks": ["noise"]}))
+    assert e_soon and "Business plan" in soon, soon
+    spaced()
     ((e2, part),) = calls(("analyse_plot", {**PLOT, "checks": ["noise"]}))
+    started()
     assert not e2 and part["status"] == "done", part
 
     folder_name = f"Live test {uuid.uuid4().hex[:6]}"
