@@ -33,8 +33,10 @@ measured finely enough, and `check_coverage` says whether a point is one of them
 
 ## Tools
 
-Every tool needs a paid RuralCheck plan, which includes every check with no limit on
-reports. Without one a client can still connect and list the tools.
+Every tool needs a paid RuralCheck plan, which includes every check. An account can
+start one new report a minute through `analyse_plot`; fetching one with `get_report`
+does not count, and more than one a minute is the Business plan. Without a plan a
+client can still connect and list the tools.
 
 Nothing here deletes a plot for good. A deleted plot goes to the Trash on the
 account, and is removed 30 days later or when the reader empties the Trash on the
