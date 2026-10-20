@@ -66,6 +66,13 @@ WRITES = {"analyse_plot", "save_plot", "update_plot", "file_plot", "delete_plot"
           "restore_plot", "create_folder", "rename_folder", "delete_folder"}
 
 
+def test_the_instructions_say_what_a_report_is_as_the_site_does():
+    # cmosig/ruralcheck#430. The sentence itself is held to the site's /llms.txt
+    # by tests/test_live.py.
+    assert server.CLAIM in server.INSTRUCTIONS
+    assert "estimate" not in server.INSTRUCTIONS.lower()
+
+
 def test_tools_are_listed_with_honest_hints():
     async def go():
         async with Client(server.mcp) as client:

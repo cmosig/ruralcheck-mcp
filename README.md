@@ -27,7 +27,7 @@ back with its figure, its caveats and where it came from.
 
 `list_checks` returns the current list with a description, price and time for each.
 
-Everything is computed from public data. It is an estimate. It is not a survey, a
+Every number is derived from official data. A report is not a land survey, a
 valuation or legal advice. It covers the parts of Europe where the ground is
 measured finely enough, and `check_coverage` says whether a point is one of them.
 

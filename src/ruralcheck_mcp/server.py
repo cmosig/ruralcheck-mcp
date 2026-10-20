@@ -24,7 +24,13 @@ from pydantic import BaseModel, Field
 from . import __version__
 from .api import APIError, Config, RuralCheck
 
-INSTRUCTIONS = """\
+# What a report is made of, in the words the site says it everywhere a stranger
+# reads (ruralcheck/provenance.py there, cmosig/ruralcheck#430). It said "computed
+# from public data and is an estimate" after the site had stopped saying so;
+# tests/test_live.py now fails when this sentence is not in the site's /llms.txt.
+CLAIM = "Every number is derived from official data."
+
+INSTRUCTIONS = f"""\
 RuralCheck analyses a point in rural Europe for someone thinking of buying land or a
 house there: sun hours with the hills taken into account, modelled road and rail
 noise, flood and wildfire history, protected areas, the land-register plot, slope,
@@ -41,8 +47,8 @@ An estate agent on the Professional plan can send their listings with
 upload_listings: each becomes a saved plot with a full report and a client link,
 run one after another. Follow the upload with get_listing_upload.
 
-Everything is computed from public data and is an estimate, not a survey, a
-valuation or legal advice. Pass on the caveats each check carries.
+{CLAIM} A report is not a land survey, a valuation or legal advice. Pass
+on the notes each check carries about what its figure cannot show.
 
 My plots is the account's own list of kept reports. save_plot keeps a report that
 ran every check. Plots can be put in folders, renamed and given a note. delete_plot

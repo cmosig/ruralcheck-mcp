@@ -175,3 +175,13 @@ def test_a_plot_is_kept_filed_trashed_and_restored():
     # The folder went, and the plot stayed, in no folder.
     assert loose["folder"] is None and not loose["in_trash"]
     assert last["in_trash"]
+
+
+def test_the_site_says_what_this_server_says():
+    """The instructions an assistant reads on connecting say what a report is made of
+    in the site's own words. /llms.txt is drawn from ruralcheck/provenance.py there,
+    so a change of wording on the site fails here until this server follows it."""
+    import httpx
+    from ruralcheck_mcp import server
+    llms = httpx.get(f"{LIVE.rstrip('/')}/llms.txt", timeout=30).text
+    assert server.CLAIM in llms, "the site no longer says " + server.CLAIM
