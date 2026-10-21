@@ -138,13 +138,15 @@ CHECKS = Annotated[list[str] | None, Field(
 
 @mcp.tool(annotations=READ_ONLY, structured_output=False)
 async def find_place(
-    query: Annotated[str, Field(max_length=200, description="A place name, or coordinates as 'lat, lon'.")],
+    query: Annotated[str, Field(max_length=200, description="A place, region, country or postcode, or coordinates as 'lat, lon'.")],
     ctx: Context,
 ) -> str:
-    """Turn a village, town or region name in Europe into coordinates.
+    """Turn a village, town, region, country or postcode in Europe into coordinates.
 
-    Street addresses are not searchable: an address is
-    reduced to the settlement it names and marked approximate.
+    A region, country or postcode comes back with `bbox` (west, south, east, north)
+    and `served` (yes, part or no: whether reports are made there). Street addresses
+    are not searchable: an address is reduced to the settlement it names and marked
+    approximate.
     """
     return await _call(ctx, lambda api: api.search(query))
 

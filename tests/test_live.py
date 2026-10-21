@@ -92,6 +92,17 @@ def test_the_contract_holds():
     assert e7 and "no_such_check" in bad
 
 
+def test_find_place_finds_regions_and_postcodes():
+    """A region and a postcode are areas: they carry their extent and say whether
+    reports are made there (cmosig/ruralcheck, the search's areas)."""
+    (e1, region), (e2, code) = calls(("find_place", {"query": "Styria"}),
+                                     ("find_place", {"query": "33540"}))
+    assert not (e1 or e2), (region, code)
+    top = region["results"][0]
+    assert top["kind"] == "region" and len(top["bbox"]) == 4 and top["served"] in ("yes", "part", "no")
+    assert code["results"][0]["kind"] == "postcode"
+
+
 def test_listings_go_in_and_come_back_with_their_reasons():
     """Needs a key on the Professional plan. Sends two listings that will not run,
     so the test saves no plot and runs no report: one without a position and one
