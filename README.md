@@ -44,7 +44,7 @@ website.
 
 | Tool | What it does |
 |---|---|
-| `find_place` | A village or town name to coordinates. Street addresses are not searchable. |
+| `find_place` | A village, town, region, country or postcode to coordinates; an area comes with its extent and whether reports are made there. Street addresses are reduced to their town. |
 | `check_coverage` | Whether a point can be analysed, and how finely its ground is measured. |
 | `list_checks` | Every check, with what it covers and how long it takes. |
 | `analyse_plot` | Runs the checks you name for one point and returns the results. |
