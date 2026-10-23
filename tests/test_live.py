@@ -142,7 +142,9 @@ def test_a_plot_is_kept_filed_trashed_and_restored():
     assert whole["status"] == "done", whole
     # A second report within the minute is refused, and the sentence says why.
     ((e_soon, soon),) = calls(("analyse_plot", {**PLOT, "checks": ["noise"]}))
-    assert e_soon and "Business plan" in soon, soon
+    # "Individual solution" since the plan was renamed (ruralcheck #776); the old
+    # name is accepted until that is live.
+    assert e_soon and ("Individual solution" in soon or "Business plan" in soon), soon
     spaced()
     ((e2, part),) = calls(("analyse_plot", {**PLOT, "checks": ["noise"]}))
     started()
