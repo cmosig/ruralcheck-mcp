@@ -35,7 +35,7 @@ measured finely enough, and `check_coverage` says whether a point is one of them
 
 Every tool needs a paid RuralCheck plan, which includes every check. An account can
 start one new report a minute through `analyse_plot`; fetching one with `get_report`
-does not count, and more than one a minute is an Individual solution. Without a plan a
+does not count, and more than one a minute is a Custom solution. Without a plan a
 client can still connect and list the tools.
 
 Nothing here deletes a plot for good. A deleted plot goes to the Trash on the

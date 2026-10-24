@@ -41,7 +41,7 @@ whether the point is served, then analyse_plot. Ask only for the checks the
 question needs, from list_checks: a whole report is large. Every tool needs a paid
 RuralCheck plan, which includes every check. An account can start one new report a
 minute, so ask for every check a question needs in one analyse_plot call; more than
-that is an Individual solution.
+that is a Custom solution.
 
 An estate agent on the Professional plan can send their listings with
 upload_listings: each becomes a saved plot with a full report and a client link,
