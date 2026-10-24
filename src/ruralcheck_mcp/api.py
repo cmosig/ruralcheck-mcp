@@ -159,7 +159,7 @@ class RuralCheck:
         return (await self._call("DELETE", f"/api/v1/folders/{_id(folder_id, 'folder')}"))[1]
 
     # Listing uploads: a Professional account's listings, each run as a full report
-    # with a saved plot and a client link, one after another on the server.
+    # with a saved plot and a share link, one after another on the server.
 
     async def send_listings(self, listings: list[dict], name: str = "") -> dict:
         payload: dict[str, Any] = {"listings": listings}

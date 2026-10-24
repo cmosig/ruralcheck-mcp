@@ -44,7 +44,7 @@ minute, so ask for every check a question needs in one analyse_plot call; more t
 that is a Custom solution.
 
 An estate agent on the Professional plan can send their listings with
-upload_listings: each becomes a saved plot with a full report and a client link,
+upload_listings: each becomes a saved plot with a full report and a share link,
 run one after another. Follow the upload with get_listing_upload.
 
 {CLAIM} A report is not a land survey, a valuation or legal advice. Pass
@@ -239,7 +239,7 @@ async def upload_listings(
 ) -> str:
     """Send an estate agent's listings to RuralCheck. Professional plan.
 
-    Each listing becomes a saved plot with a full report and a client link the
+    Each listing becomes a saved plot with a full report and a share link the
     agent can put in the listing. Reports run one after another on the server,
     about half a minute each, and wait for anyone using the site, so this returns
     at once with the upload's id. Follow it with get_listing_upload. Up to 100
@@ -257,7 +257,7 @@ async def get_listing_upload(
     upload_id: Annotated[int, Field(ge=1, description="The id upload_listings returned.")],
     ctx: Context,
 ) -> str:
-    """An upload's progress: for each listing its status, its client link once its
+    """An upload's progress: for each listing its status, its share link once its
     report is done, or the reason it was not run. `status` is "done" when nothing
     is left to run.
     """

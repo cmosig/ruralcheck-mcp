@@ -50,8 +50,8 @@ website.
 | `analyse_plot` | Runs the checks you name for one point and returns the results. |
 | `get_report` | Fetches a report that took longer than one tool call waits. |
 | `sample_report` | A real full report for a plot in the Black Forest, to see what each check returns. |
-| `upload_listings` | Professional plan. Sends an agent's listings: each becomes a saved plot with a full report and a client link, run one after another. |
-| `get_listing_upload` | An upload's progress: each listing's status, its client link, or why it was not run. |
+| `upload_listings` | Professional plan. Sends an agent's listings: each becomes a saved plot with a full report and a share link, run one after another. |
+| `get_listing_upload` | An upload's progress: each listing's status, its share link, or why it was not run. |
 | `list_listing_uploads` | The account's uploads and how far each has got. |
 | `list_plots` | The plots the account keeps, with the key figure of each check. Or the Trash. |
 | `get_plot` | One kept plot with its report, as it was when it was kept. |
