@@ -16,7 +16,18 @@ classifiers = [
     "Programming Language :: Python :: 3",
     "Topic :: Scientific/Engineering :: GIS",
 ]
-dependencies = ["mcp>=2.2,<3", "httpx>=0.27", "uvicorn>=0.30"]
+dependencies = [
+    "mcp>=2.2,<3",
+    "httpx>=0.27",
+    "uvicorn>=0.30",
+    # mcp reads each request's _meta.tracestate with opentelemetry-api, whose
+    # parser before 1.45.1 takes quadratic time (GHSA-xcq7-p3pf-p88h): one 1 MB
+    # request held the hosted server's event loop for about 20 minutes.
+    "opentelemetry-api>=1.45.1",
+    # Arrives with httpx. 2026.10.19 drops the compromised emSign intermediates
+    # (GHSA-6q48-6c7w-9gw2).
+    "certifi>=2026.10.19",
+]
 
 [project.urls]
 Homepage = "https://ruralcheck.eu"
