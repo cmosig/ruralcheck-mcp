@@ -18,7 +18,7 @@ back with its figure, its caveats and where it came from.
 | View | how far the view runs, and what is in view |
 | Local area | nearest village and town, people nearby, shops and services, bodies of water, emergency services, drive times, local economy, visitors, sales nearby, town websites, hunting |
 | Annoyances | road and rail noise, aircraft, nuisances, bites and stings, wild animals, burglary |
-| Plot | land register, paths on the plot, municipality, planning zone, rules here, tax when you buy, yearly property tax, terrain, protected areas |
+| Plot | land register, paths on the plot, municipality, planning zone, rules here, sales tax, yearly property tax, terrain, protected areas |
 | Weather and climate | weather, sun, wind, snow, night sky, air quality, climate in 2050 |
 | Risks | flooding, coastal flooding, wildfire, landslides, avalanches, earthquake, termites and dry rot |
 | Infrastructure | solar panels, groundwater, water restrictions, internet |
