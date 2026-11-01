@@ -38,10 +38,10 @@ climate now and around 2050, drive times and more.
 
 Typical flow: find_place to turn a name into coordinates, check_coverage to see
 whether the point is served, then analyse_plot. Ask only for the checks the
-question needs, from list_checks: a whole report is large. Every tool needs a paid
-RuralCheck plan, which includes every check. An account can start one new report a
-minute, so ask for every check a question needs in one analyse_plot call; more than
-that is a Custom solution.
+question needs, from list_checks: a whole report is large. Every tool needs a
+RuralCheck account. The free plan runs the checks list_checks marks free, and a paid
+plan runs every check. An account can start one new report a minute, so ask for
+every check a question needs in one analyse_plot call.
 
 An estate agent on the Professional plan can send their listings with
 upload_listings: each becomes a saved plot with a full report and a share link,
@@ -51,7 +51,7 @@ run one after another. Follow the upload with get_listing_upload.
 on the notes each check carries about what its figure cannot show.
 
 My plots is the account's own list of kept reports. save_plot keeps a report that
-ran every check. Plots can be put in folders, renamed and given a note. delete_plot
+ran every check of its plan. Plots can be put in folders, renamed and given a note. delete_plot
 moves a plot to the Trash, where it can be restored for 30 days. Nothing here
 deletes a plot for good. That happens only on the website, or 30 days later.
 """
@@ -59,7 +59,13 @@ deletes a plot for good. That happens only on the website, or 30 days later.
 LAT = Annotated[float, Field(ge=27, le=72, description="Latitude in degrees (WGS84).")]
 LON = Annotated[float, Field(ge=-32, le=45, description="Longitude in degrees (WGS84).")]
 
-READ_ONLY = ToolAnnotations(readOnlyHint=True, openWorldHint=True, idempotentHint=True)
+# Every hint is given, false ones too: ChatGPT's review asks for all three as
+# explicit booleans, and Claude's for a title and the hint that applies.
+READ_ONLY = ToolAnnotations(readOnlyHint=True, destructiveHint=False,
+                            openWorldHint=True, idempotentHint=True)
+# Starts work on the server, and loses nothing the reader has.
+STARTS = ToolAnnotations(readOnlyHint=False, destructiveHint=False,
+                         openWorldHint=True, idempotentHint=False)
 
 # How long one tool call waits for a report before handing back an id to poll
 # with get_report. A full report is 10-30 s, and the common clients give a tool
@@ -127,16 +133,16 @@ async def _call(ctx: Context, fn: Callable[[RuralCheck], Awaitable[Any]]) -> str
         await api.aclose()
 
 
-NO_KEY = ("RuralCheck needs a paid plan. Set RURALCHECK_API_KEY to a key from the "
+NO_KEY = ("RuralCheck needs an account. Set RURALCHECK_API_KEY to a key from the "
           "account page at ruralcheck.eu, or connect to the hosted server, which signs "
           "you in.")
 
 CHECKS = Annotated[list[str] | None, Field(
     description="Check names from list_checks, e.g. ['flood', 'noise', 'sun']. "
-                "Omit for every check.")]
+                "Omit for every check the account's plan includes.")]
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=False)
+@mcp.tool(title="Find a place", annotations=READ_ONLY, structured_output=False)
 async def find_place(
     query: Annotated[str, Field(max_length=2000, description="A place, region, country or postcode, coordinates as 'lat, lon', a plus code ('8FVC9G8F+6X', or '9G8F+6X Zurich' with its town), or a Google Maps or OpenStreetMap link.")],
     ctx: Context,
@@ -145,14 +151,14 @@ async def find_place(
 
     Also reads plus codes and map links. A region, country or postcode comes back
     with `bbox` (west, south, east, north) and `served` (yes, part or no: whether
-    reports are made there). Street addresses are not searchable: an address is
-    reduced to the settlement it names and marked approximate. When nothing is
-    found, `message` says what to add.
+    reports are made there). Street addresses are found in Norway, Belgium and
+    Denmark. Elsewhere an address is reduced to the settlement it names and marked
+    approximate. When nothing is found, `message` says what to add.
     """
     return await _call(ctx, lambda api: api.search(query))
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=False)
+@mcp.tool(title="Check coverage", annotations=READ_ONLY, structured_output=False)
 async def check_coverage(lat: LAT, lon: LON, ctx: Context) -> str:
     """Whether RuralCheck can analyse this point, and how finely the ground is measured.
 
@@ -162,21 +168,22 @@ async def check_coverage(lat: LAT, lon: LON, ctx: Context) -> str:
     return await _call(ctx, lambda api: api.coverage(lat, lon))
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=False)
+@mcp.tool(title="List checks", annotations=READ_ONLY, structured_output=False)
 async def list_checks(ctx: Context) -> str:
-    """Every check a report can run: its name, what it answers and roughly how long
-    it takes. Pass names from here to analyse_plot.
+    """Every check a report can run: its name, what it answers, roughly how long it
+    takes, and whether the free plan runs it (`free`). Pass names from here to
+    analyse_plot.
     """
     return await _call(ctx, lambda api: api.checks())
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True, idempotentHint=False),
-          structured_output=False)
+@mcp.tool(title="Analyse a plot", annotations=STARTS, structured_output=False)
 async def analyse_plot(lat: LAT, lon: LON, ctx: Context, checks: CHECKS = None) -> str:
     """Analyse a plot of rural land in Europe and return the result of each check.
 
-    Checks a chosen one depends on run too and are returned with it. Most answers take a few seconds; if one runs longer than this
-    call waits, the answer carries an id to pass to get_report.
+    Checks a chosen one depends on run too and are returned with it. Most answers
+    take a few seconds. If one runs longer than this call waits, the answer carries
+    an id to pass to get_report.
 
     An account can start one new report a minute, so name every check needed in
     one call. Fetching a report with get_report does not count.
@@ -195,7 +202,7 @@ async def analyse_plot(lat: LAT, lon: LON, ctx: Context, checks: CHECKS = None) 
     return await _call(ctx, run)
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=False)
+@mcp.tool(title="Get a report", annotations=READ_ONLY, structured_output=False)
 async def get_report(
     report_id: Annotated[str, Field(max_length=64, description="The id analyse_plot returned.")],
     ctx: Context,
@@ -206,9 +213,10 @@ async def get_report(
     return await _call(ctx, run)
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=False)
+@mcp.tool(title="Sample report", annotations=READ_ONLY, structured_output=False)
 async def sample_report(ctx: Context, checks: CHECKS = None) -> str:
-    """The public sample: a real full report for a plot in the Black Forest.
+    """The public sample: a real full report for 4 ha of land at Trémolat in the
+    Dordogne valley, France.
 
     Use it to see what each check returns before asking for a report of your own.
     """
@@ -230,8 +238,7 @@ class Listing(BaseModel):
     reference: str = Field("", max_length=255, description="The agent's own reference.")
 
 
-@mcp.tool(annotations=ToolAnnotations(readOnlyHint=False, openWorldHint=True, idempotentHint=False),
-          structured_output=False)
+@mcp.tool(title="Upload listings", annotations=STARTS, structured_output=False)
 async def upload_listings(
     listings: Annotated[list[Listing], Field(min_length=1, max_length=2000, description=(
         "The properties, each with name, lat, lon and reference."))],
@@ -253,7 +260,7 @@ async def upload_listings(
     return await _call(ctx, lambda api: api.send_listings(items, name))
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=False)
+@mcp.tool(title="Upload progress", annotations=READ_ONLY, structured_output=False)
 async def get_listing_upload(
     upload_id: Annotated[int, Field(ge=1, description="The id upload_listings returned.")],
     ctx: Context,
@@ -265,7 +272,7 @@ async def get_listing_upload(
     return await _call(ctx, lambda api: api.listing_upload(upload_id))
 
 
-@mcp.tool(annotations=READ_ONLY, structured_output=False)
+@mcp.tool(title="List uploads", annotations=READ_ONLY, structured_output=False)
 async def list_listing_uploads(ctx: Context) -> str:
     """The account's listing uploads, newest first, with how far each has got."""
     return await _call(ctx, lambda api: api.listing_uploads())
@@ -284,7 +291,7 @@ def _hints(read_only: bool = False, destructive: bool = False, idempotent: bool 
                            idempotentHint=idempotent, openWorldHint=False)
 
 
-@mcp.tool(annotations=_hints(read_only=True), structured_output=False)
+@mcp.tool(title="List plots", annotations=_hints(read_only=True), structured_output=False)
 async def list_plots(
     ctx: Context,
     folder_id: Annotated[int | None, Field(ge=1, description="Only the plots in this folder.")] = None,
@@ -299,7 +306,7 @@ async def list_plots(
     return await _call(ctx, lambda api: api.plots(folder_id, in_trash))
 
 
-@mcp.tool(annotations=_hints(read_only=True), structured_output=False)
+@mcp.tool(title="Get a plot", annotations=_hints(read_only=True), structured_output=False)
 async def get_plot(plot_id: PLOT_ID, ctx: Context) -> str:
     """One kept plot with its report, as it was when it was kept.
 
@@ -313,7 +320,7 @@ async def get_plot(plot_id: PLOT_ID, ctx: Context) -> str:
     return await _call(ctx, run)
 
 
-@mcp.tool(annotations=_hints(), structured_output=False)
+@mcp.tool(title="Save a plot", annotations=_hints(), structured_output=False)
 async def save_plot(
     report_id: Annotated[str, Field(max_length=64, description="The id analyse_plot returned.")],
     ctx: Context,
@@ -323,14 +330,14 @@ async def save_plot(
 ) -> str:
     """Keep a finished report in My plots.
 
-    Only a report that ran every check can be kept, so call analyse_plot without
-    naming checks first. Keeping the same point again replaces its report, keeps its
+    Only a report that ran every check of the account's plan can be kept, so call
+    analyse_plot without naming checks first. Keeping the same point again replaces its report, keeps its
     name and note, and takes it out of the Trash if it was there.
     """
     return await _call(ctx, lambda api: api.keep(report_id, name, folder_id))
 
 
-@mcp.tool(annotations=_hints(destructive=True), structured_output=False)
+@mcp.tool(title="Edit a plot", annotations=_hints(destructive=True), structured_output=False)
 async def update_plot(
     plot_id: PLOT_ID,
     ctx: Context,
@@ -345,7 +352,7 @@ async def update_plot(
     return await _call(ctx, lambda api: api.edit_plot(plot_id, fields))
 
 
-@mcp.tool(annotations=_hints(), structured_output=False)
+@mcp.tool(title="File a plot", annotations=_hints(), structured_output=False)
 async def file_plot(
     plot_id: PLOT_ID,
     ctx: Context,
@@ -356,7 +363,7 @@ async def file_plot(
     return await _call(ctx, lambda api: api.edit_plot(plot_id, {"folder_id": folder_id}))
 
 
-@mcp.tool(annotations=_hints(destructive=True), structured_output=False)
+@mcp.tool(title="Move to Trash", annotations=_hints(destructive=True), structured_output=False)
 async def delete_plot(plot_id: PLOT_ID, ctx: Context) -> str:
     """Move a kept plot to the Trash.
 
@@ -366,31 +373,31 @@ async def delete_plot(plot_id: PLOT_ID, ctx: Context) -> str:
     return await _call(ctx, lambda api: api.trash(plot_id))
 
 
-@mcp.tool(annotations=_hints(), structured_output=False)
+@mcp.tool(title="Restore a plot", annotations=_hints(), structured_output=False)
 async def restore_plot(plot_id: PLOT_ID, ctx: Context) -> str:
     """Take a plot out of the Trash, back into its folder if that still exists."""
     return await _call(ctx, lambda api: api.restore(plot_id))
 
 
-@mcp.tool(annotations=_hints(read_only=True), structured_output=False)
+@mcp.tool(title="List folders", annotations=_hints(read_only=True), structured_output=False)
 async def list_folders(ctx: Context) -> str:
     """The account's folders, each with how many plots are in it."""
     return await _call(ctx, lambda api: api.folders())
 
 
-@mcp.tool(annotations=_hints(idempotent=False), structured_output=False)
+@mcp.tool(title="New folder", annotations=_hints(idempotent=False), structured_output=False)
 async def create_folder(name: FOLDER_NAME, ctx: Context) -> str:
     """Make a folder for kept plots. Each name can be used once, whatever the case."""
     return await _call(ctx, lambda api: api.new_folder(name))
 
 
-@mcp.tool(annotations=_hints(), structured_output=False)
+@mcp.tool(title="Rename folder", annotations=_hints(), structured_output=False)
 async def rename_folder(folder_id: FOLDER_ID, name: FOLDER_NAME, ctx: Context) -> str:
     """Rename a folder."""
     return await _call(ctx, lambda api: api.rename_folder(folder_id, name))
 
 
-@mcp.tool(annotations=_hints(destructive=True), structured_output=False)
+@mcp.tool(title="Delete folder", annotations=_hints(destructive=True), structured_output=False)
 async def delete_folder(folder_id: FOLDER_ID, ctx: Context) -> str:
     """Delete a folder. Its plots stay in My plots, in no folder."""
     return await _call(ctx, lambda api: api.remove_folder(folder_id))

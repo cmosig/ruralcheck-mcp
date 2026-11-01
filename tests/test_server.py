@@ -92,6 +92,19 @@ def test_tools_are_listed_with_honest_hints():
     assert "Trash" in tools["delete_plot"].description
 
 
+def test_every_tool_has_a_title_and_every_hint():
+    # Claude's directory review wants a title on every tool, and ChatGPT's wants
+    # readOnlyHint, destructiveHint and openWorldHint as explicit booleans.
+    async def go():
+        async with Client(server.mcp) as client:
+            return (await client.list_tools()).tools
+    for t in run(go()):
+        assert t.title and len(t.title.split()) <= 3, t.name
+        a = t.annotations
+        for hint in (a.read_only_hint, a.destructive_hint, a.open_world_hint):
+            assert isinstance(hint, bool), t.name
+
+
 def test_report_finished_in_one_call():
     transport, seen = fake_api({("POST", "/api/v1/reports"): (200, DONE)})
     err, out = run(call(transport, "analyse_plot", {"lat": 48.0, "lon": 8.2, "checks": ["flood"]}))
@@ -180,7 +193,7 @@ def test_every_tool_needs_a_key_and_says_so():
     for tool, a in args.items():
         transport, seen = fake_api({})
         err, text = run(call(transport, tool, a, key=None))
-        assert err and "paid plan" in text, (tool, text)
+        assert err and "needs an account" in text, (tool, text)
         assert not seen, f"{tool} reached the API without a key"
 
 
@@ -325,6 +338,23 @@ def test_a_refused_plot_says_why():
     transport, _ = fake_api({("POST", "/api/v1/plots"): (409, {"detail": detail})})
     err, text = run(call(transport, "save_plot", {"report_id": "abc123"}))
     assert err and "every check" in text and "analyse this point" not in text, text
+
+
+def test_registry_entry_matches_the_package():
+    # server.json is what the official MCP Registry publishes, and a published
+    # version can never be changed. Its version is the one the server reports, its
+    # name is the one the README carries, and every package it names must exist
+    # where it says, or the publish is refused (none is on PyPI today).
+    root = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+    with open(os.path.join(root, "server.json")) as f:
+        entry = json.load(f)
+    with open(os.path.join(root, "README.md")) as f:
+        readme = f.read()
+    assert entry["version"] == server.__version__
+    assert f"mcp-name: {entry['name']}" in readme
+    assert len(entry["description"]) <= 100
+    assert [r["url"] for r in entry["remotes"]] == ["https://ruralcheck.eu/mcp"]
+    assert "packages" not in entry
 
 
 if __name__ == "__main__":
