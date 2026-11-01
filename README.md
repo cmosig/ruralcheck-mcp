@@ -25,8 +25,8 @@ back with its figure, its caveats and where it came from.
 | Vegetation | trees, pollen, what grows here |
 | Access | public transport, access road |
 
-`list_checks` returns the current list with what each check covers and how long it
-takes.
+`list_checks` returns the current list with what each check covers, how long it
+takes and whether the free plan runs it.
 
 Every number is derived from official data. A report is not a land survey, a
 valuation or legal advice. It covers the parts of Europe where the ground is
@@ -34,10 +34,10 @@ measured finely enough, and `check_coverage` says whether a point is one of them
 
 ## Tools
 
-Every tool needs a paid RuralCheck plan, which includes every check. An account can
-start one new report a minute through `analyse_plot`. Fetching one with `get_report`
-does not count. More than one a minute is a Custom solution. Without a plan a
-client can still connect and list the tools.
+Every tool needs a RuralCheck account. The free plan runs the free checks, with the
+same limits as on the map, and a paid plan runs every check. An account can start
+one new report a minute through `analyse_plot`. Fetching one with `get_report` does
+not count. More than one a minute is a Custom solution.
 
 Nothing here deletes a plot for good. A deleted plot goes to the Trash on the
 account, and is removed 30 days later or when the reader empties the Trash on the
@@ -47,7 +47,7 @@ website.
 |---|---|
 | `find_place` | A village, town, region, country or postcode to coordinates. An area comes with its extent and whether reports are made there. Street addresses are found in Norway, Belgium and Denmark, and elsewhere reduced to their town. |
 | `check_coverage` | Whether a point can be analysed, and how finely its ground is measured. |
-| `list_checks` | Every check, with what it covers and how long it takes. |
+| `list_checks` | Every check, with what it covers, how long it takes and whether the free plan runs it. |
 | `analyse_plot` | Runs the checks you name for one point and returns the results. |
 | `get_report` | Fetches a report that took longer than one tool call waits. |
 | `sample_report` | A real full report for 4 ha of land in the Dordogne valley, to see what each check returns. |
@@ -56,7 +56,7 @@ website.
 | `list_listing_uploads` | The account's uploads and how far each has got. |
 | `list_plots` | The plots the account keeps, with the key figure of each check. Or the Trash. |
 | `get_plot` | One kept plot with its report, as it was when it was kept. |
-| `save_plot` | Keeps a finished report in My plots. Only a report that ran every check. |
+| `save_plot` | Keeps a finished report in My plots. Only a report that ran every check of its plan. |
 | `update_plot` | Renames a kept plot or replaces its note. |
 | `file_plot` | Puts a kept plot in a folder, or takes it out of one. |
 | `delete_plot` | Moves a kept plot to the Trash. It can be restored for 30 days. |

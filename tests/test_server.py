@@ -193,7 +193,7 @@ def test_every_tool_needs_a_key_and_says_so():
     for tool, a in args.items():
         transport, seen = fake_api({})
         err, text = run(call(transport, tool, a, key=None))
-        assert err and "paid plan" in text, (tool, text)
+        assert err and "needs an account" in text, (tool, text)
         assert not seen, f"{tool} reached the API without a key"
 
 

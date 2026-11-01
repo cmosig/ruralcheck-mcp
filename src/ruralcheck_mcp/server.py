@@ -38,9 +38,10 @@ climate now and around 2050, drive times and more.
 
 Typical flow: find_place to turn a name into coordinates, check_coverage to see
 whether the point is served, then analyse_plot. Ask only for the checks the
-question needs, from list_checks: a whole report is large. Every tool needs a paid
-RuralCheck plan, which includes every check. An account can start one new report a
-minute, so ask for every check a question needs in one analyse_plot call.
+question needs, from list_checks: a whole report is large. Every tool needs a
+RuralCheck account. The free plan runs the checks list_checks marks free, and a paid
+plan runs every check. An account can start one new report a minute, so ask for
+every check a question needs in one analyse_plot call.
 
 An estate agent on the Professional plan can send their listings with
 upload_listings: each becomes a saved plot with a full report and a share link,
@@ -50,7 +51,7 @@ run one after another. Follow the upload with get_listing_upload.
 on the notes each check carries about what its figure cannot show.
 
 My plots is the account's own list of kept reports. save_plot keeps a report that
-ran every check. Plots can be put in folders, renamed and given a note. delete_plot
+ran every check of its plan. Plots can be put in folders, renamed and given a note. delete_plot
 moves a plot to the Trash, where it can be restored for 30 days. Nothing here
 deletes a plot for good. That happens only on the website, or 30 days later.
 """
@@ -132,13 +133,13 @@ async def _call(ctx: Context, fn: Callable[[RuralCheck], Awaitable[Any]]) -> str
         await api.aclose()
 
 
-NO_KEY = ("RuralCheck needs a paid plan. Set RURALCHECK_API_KEY to a key from the "
+NO_KEY = ("RuralCheck needs an account. Set RURALCHECK_API_KEY to a key from the "
           "account page at ruralcheck.eu, or connect to the hosted server, which signs "
           "you in.")
 
 CHECKS = Annotated[list[str] | None, Field(
     description="Check names from list_checks, e.g. ['flood', 'noise', 'sun']. "
-                "Omit for every check.")]
+                "Omit for every check the account's plan includes.")]
 
 
 @mcp.tool(title="Find a place", annotations=READ_ONLY, structured_output=False)
@@ -169,8 +170,9 @@ async def check_coverage(lat: LAT, lon: LON, ctx: Context) -> str:
 
 @mcp.tool(title="List checks", annotations=READ_ONLY, structured_output=False)
 async def list_checks(ctx: Context) -> str:
-    """Every check a report can run: its name, what it answers and roughly how long
-    it takes. Pass names from here to analyse_plot.
+    """Every check a report can run: its name, what it answers, roughly how long it
+    takes, and whether the free plan runs it (`free`). Pass names from here to
+    analyse_plot.
     """
     return await _call(ctx, lambda api: api.checks())
 
@@ -328,8 +330,8 @@ async def save_plot(
 ) -> str:
     """Keep a finished report in My plots.
 
-    Only a report that ran every check can be kept, so call analyse_plot without
-    naming checks first. Keeping the same point again replaces its report, keeps its
+    Only a report that ran every check of the account's plan can be kept, so call
+    analyse_plot without naming checks first. Keeping the same point again replaces its report, keeps its
     name and note, and takes it out of the Trash if it was there.
     """
     return await _call(ctx, lambda api: api.keep(report_id, name, folder_id))
