@@ -3,34 +3,23 @@
   "name": "eu.ruralcheck/ruralcheck",
   "title": "RuralCheck",
   "description": "Location analysis for rural property in Europe: flood, noise, sun hours, land register and more.",
-  "websiteUrl": "https://ruralcheck.eu",
+  "websiteUrl": "https://ruralcheck.eu/agents",
   "repository": {
     "url": "https://github.com/cmosig/ruralcheck-mcp",
     "source": "github"
   },
-  "version": "0.1.0",
+  "version": "1.0.0",
+  "icons": [
+    {
+      "src": "https://ruralcheck.eu/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": ["512x512"]
+    }
+  ],
   "remotes": [
     {
       "type": "streamable-http",
       "url": "https://ruralcheck.eu/mcp"
-    }
-  ],
-  "packages": [
-    {
-      "registryType": "pypi",
-      "identifier": "ruralcheck-mcp",
-      "version": "0.1.0",
-      "transport": {
-        "type": "stdio"
-      },
-      "environmentVariables": [
-        {
-          "name": "RURALCHECK_API_KEY",
-          "description": "Your RuralCheck API key, from a paid plan.",
-          "isRequired": true,
-          "isSecret": true
-        }
-      ]
     }
   ]
 }

@@ -8,10 +8,6 @@ whether a field floods, how loud the road is, how many hours of sun the house ge
 in January, or which land-register plot it is. The agent calls RuralCheck and gets
 back computed figures with their sources.
 
-> **Status: preview.** The API behind this server is not public yet. The tools, the
-> contract and the tests are real. The hosted endpoint and the API keys arrive when
-> ruralcheck.eu launches.
-
 ## What it can answer
 
 A report is a set of checks. You ask only for the ones you need, and each comes
@@ -19,13 +15,18 @@ back with its figure, its caveats and where it came from.
 
 | Group | Checks |
 |---|---|
-| Local area | municipality, nearest village and town, public transport, shops and services, bodies of water (lakes, rivers, the sea, beaches and public pools a road or path reaches), phone signal and internet, drive times |
-| Land | land-register plot, paths across it and whether a road reaches it, terrain (slope and height), what the plot can see |
-| Hazards | river flooding, wildfire history, earthquake shaking, protected areas |
-| Living there | modelled road and rail noise, sun hours with the hills taken into account, solar yield, wind, night sky, snow, air quality, climate now and around 2050, woods |
-| Region | household income and population, visitor numbers, the rules a buyer meets in the country and region |
+| View | how far the view runs, and what is in view |
+| Local area | nearest village and town, people nearby, shops and services, bodies of water, emergency services, drive times, local economy, visitors, sales nearby, town websites, hunting |
+| Annoyances | road and rail noise, aircraft, nuisances, bites and stings, wild animals, burglary |
+| Plot | land register, paths on the plot, municipality, planning zone, rules here, tax when you buy, yearly property tax, terrain, protected areas |
+| Weather and climate | weather, sun, wind, snow, night sky, air quality, climate in 2050 |
+| Risks | flooding, coastal flooding, wildfire, landslides, avalanches, earthquake, termites and dry rot |
+| Infrastructure | solar panels, groundwater, water restrictions, internet |
+| Vegetation | trees, pollen, what grows here |
+| Access | public transport, access road |
 
-`list_checks` returns the current list with a description, price and time for each.
+`list_checks` returns the current list with what each check covers and how long it
+takes.
 
 Every number is derived from official data. A report is not a land survey, a
 valuation or legal advice. It covers the parts of Europe where the ground is
@@ -34,8 +35,8 @@ measured finely enough, and `check_coverage` says whether a point is one of them
 ## Tools
 
 Every tool needs a paid RuralCheck plan, which includes every check. An account can
-start one new report a minute through `analyse_plot`; fetching one with `get_report`
-does not count, and more than one a minute is a Custom solution. Without a plan a
+start one new report a minute through `analyse_plot`. Fetching one with `get_report`
+does not count. More than one a minute is a Custom solution. Without a plan a
 client can still connect and list the tools.
 
 Nothing here deletes a plot for good. A deleted plot goes to the Trash on the
@@ -44,12 +45,12 @@ website.
 
 | Tool | What it does |
 |---|---|
-| `find_place` | A village, town, region, country or postcode to coordinates; an area comes with its extent and whether reports are made there. Street addresses are reduced to their town. |
+| `find_place` | A village, town, region, country or postcode to coordinates. An area comes with its extent and whether reports are made there. Street addresses are found in Norway, Belgium and Denmark, and elsewhere reduced to their town. |
 | `check_coverage` | Whether a point can be analysed, and how finely its ground is measured. |
 | `list_checks` | Every check, with what it covers and how long it takes. |
 | `analyse_plot` | Runs the checks you name for one point and returns the results. |
 | `get_report` | Fetches a report that took longer than one tool call waits. |
-| `sample_report` | A real full report for a plot in the Black Forest, to see what each check returns. |
+| `sample_report` | A real full report for 4 ha of land in the Dordogne valley, to see what each check returns. |
 | `upload_listings` | Professional plan. Sends an agent's listings: each becomes a saved plot with a full report and a share link, run one after another. |
 | `get_listing_upload` | An upload's progress: each listing's status, its share link, or why it was not run. |
 | `list_listing_uploads` | The account's uploads and how far each has got. |
