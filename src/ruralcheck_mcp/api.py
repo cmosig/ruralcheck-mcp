@@ -106,7 +106,7 @@ class RuralCheck:
                                  params=_report_params(wait_s), ok=(200, 202),
                                  timeout=wait_s + self.config.timeout_s))[1]
 
-    # My plots: the plots the account keeps, its folders and the Trash. Every id
+    # Plots (Analyse land on the website): the plots the account keeps, its folders and the Trash. Every id
     # goes into a path sent with the reader's key, so each is checked to be a
     # whole number before it gets there.
 

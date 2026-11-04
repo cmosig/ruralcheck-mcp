@@ -50,8 +50,8 @@ run one after another. Follow the upload with get_listing_upload.
 {CLAIM} A report is not a land survey, a valuation or legal advice. Pass
 on the notes each check carries about what its figure cannot show.
 
-My plots is the account's own list of kept reports. save_plot keeps a report that
-ran every check of its plan. Plots can be put in folders, renamed and given a note. delete_plot
+The account keeps its reports as plots, which the website lists under Analyse land.
+save_plot keeps a report that ran every check of its plan. Plots can be put in folders, renamed and given a note. delete_plot
 moves a plot to the Trash, where it can be restored for 30 days. Nothing here
 deletes a plot for good. That happens only on the website, or 30 days later.
 """
@@ -278,7 +278,7 @@ async def list_listing_uploads(ctx: Context) -> str:
     return await _call(ctx, lambda api: api.listing_uploads())
 
 
-# ---------------------------------------------------------------- My plots
+# ---------------------------------------------------------- Plots (Analyse land)
 
 PLOT_ID = Annotated[int, Field(ge=1, description="A plot id from list_plots or save_plot.")]
 FOLDER_ID = Annotated[int, Field(ge=1, description="A folder id from list_folders.")]
@@ -328,7 +328,7 @@ async def save_plot(
                                       "Defaults to the nearest village.")] = None,
     folder_id: Annotated[int | None, Field(ge=1, description="A folder to put it in.")] = None,
 ) -> str:
-    """Keep a finished report in My plots.
+    """Keep a finished report with the account's plots, under Analyse land on the website.
 
     Only a report that ran every check of the account's plan can be kept, so call
     analyse_plot without naming checks first. Keeping the same point again replaces its report, keeps its
@@ -399,7 +399,7 @@ async def rename_folder(folder_id: FOLDER_ID, name: FOLDER_NAME, ctx: Context) -
 
 @mcp.tool(title="Delete folder", annotations=_hints(destructive=True), structured_output=False)
 async def delete_folder(folder_id: FOLDER_ID, ctx: Context) -> str:
-    """Delete a folder. Its plots stay in My plots, in no folder."""
+    """Delete a folder. Its plots are kept, in no folder."""
     return await _call(ctx, lambda api: api.remove_folder(folder_id))
 
 

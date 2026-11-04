@@ -56,7 +56,7 @@ website.
 | `list_listing_uploads` | The account's uploads and how far each has got. |
 | `list_plots` | The plots the account keeps, with the key figure of each check. Or the Trash. |
 | `get_plot` | One kept plot with its report, as it was when it was kept. |
-| `save_plot` | Keeps a finished report in My plots. Only a report that ran every check of its plan. |
+| `save_plot` | Keeps a finished report under Analyse land. Only a report that ran every check of its plan. |
 | `update_plot` | Renames a kept plot or replaces its note. |
 | `file_plot` | Puts a kept plot in a folder, or takes it out of one. |
 | `delete_plot` | Moves a kept plot to the Trash. It can be restored for 30 days. |
@@ -143,7 +143,7 @@ API changes.
 
 The contract lives under `/api/v1/` on ruralcheck.eu: `checks`, `coverage`,
 `search`, `sample`, `reports` with a long-polling `?wait=` and
-`?drawing=false`, and `plots` and `folders` for My plots.
+`?drawing=false`, and `plots` and `folders` for the plots the website lists under Analyse land.
 
 ## Licence
 
